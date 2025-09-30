@@ -1,0 +1,634 @@
+"""
+设置窗口 - 应用配置和管理
+"""
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QLabel, QPushButton, QCheckBox, QSpinBox, 
+                             QGroupBox, QFormLayout, QLineEdit, QTabWidget,
+                             QListWidget, QMessageBox, QSystemTrayIcon, QMenu)
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QFont, QAction, QIcon, QKeySequence
+from core import StorageManager
+from utils import ConfigManager
+from .hotkey_edit import HotkeyEdit
+
+
+class SettingsWindow(QMainWindow):
+    """设置窗口"""
+    
+    # 信号
+    hotkey_changed = pyqtSignal(str)  # 快捷键改变
+    auto_monitor_changed = pyqtSignal(bool)  # 自动监听改变
+    ignore_self_changed = pyqtSignal(bool)  # 忽略自身复制改变
+    create_card_requested = pyqtSignal()  # 请求创建贴卡
+    card_style_changed = pyqtSignal(int, int, float)  # 贴卡样式改变 (width, height, opacity)
+    card_appearance_changed = pyqtSignal(int, str, str)  # 贴卡外观改变 (font_size, font_color, bg_color)
+    load_to_card_requested = pyqtSignal(str)  # 请求加载内容到贴卡
+    
+    def __init__(self, config=None, storage=None):
+        super().__init__()
+        
+        # 管理器（使用传入的实例或创建新的）
+        self.config = config if config else ConfigManager()
+        self.storage = storage if storage else StorageManager()
+        
+        self._init_ui()
+        self._load_settings()
+        self._init_system_tray()
+        
+    def _init_ui(self):
+        """初始化UI"""
+        self.setWindowTitle("TextPin - 设置")
+        self.setMinimumSize(600, 500)
+        
+        # 中心部件
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # 标题
+        title_label = QLabel("⚙️ TextPin 设置")
+        title_label.setFont(QFont("", 16, QFont.Weight.Bold))
+        main_layout.addWidget(title_label)
+        
+        # 选项卡
+        self.tab_widget = QTabWidget()
+        
+        # 常规设置
+        self.tab_widget.addTab(self._create_general_tab(), "常规")
+        
+        # 快捷键设置
+        self.tab_widget.addTab(self._create_hotkey_tab(), "快捷键")
+        
+        # 历史记录
+        self.tab_widget.addTab(self._create_history_tab(), "历史记录")
+        
+        # 关于
+        self.tab_widget.addTab(self._create_about_tab(), "关于")
+        
+        main_layout.addWidget(self.tab_widget)
+        
+        # 底部按钮
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        self.apply_btn = QPushButton("应用")
+        self.apply_btn.clicked.connect(lambda: self._apply_settings(show_message=True))
+        
+        self.ok_btn = QPushButton("确定")
+        self.ok_btn.clicked.connect(self._ok_clicked)
+        
+        self.cancel_btn = QPushButton("取消")
+        self.cancel_btn.clicked.connect(self.close)
+        
+        button_layout.addWidget(self.apply_btn)
+        button_layout.addWidget(self.ok_btn)
+        button_layout.addWidget(self.cancel_btn)
+        
+        main_layout.addLayout(button_layout)
+        
+    def _create_general_tab(self):
+        """创建常规设置标签"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        # 剪贴板监听
+        clipboard_group = QGroupBox("剪贴板监听")
+        clipboard_layout = QVBoxLayout()
+        
+        self.auto_monitor_check = QCheckBox("自动监听剪贴板")
+        self.auto_monitor_check.setToolTip("启动时自动开始监听剪贴板变化")
+        clipboard_layout.addWidget(self.auto_monitor_check)
+        
+        self.ignore_self_check = QCheckBox("忽略自身复制操作")
+        self.ignore_self_check.setToolTip("不监听从贴卡窗口中复制的内容")
+        self.ignore_self_check.setChecked(True)
+        clipboard_layout.addWidget(self.ignore_self_check)
+        
+        clipboard_group.setLayout(clipboard_layout)
+        layout.addWidget(clipboard_group)
+        
+        # 贴卡设置
+        card_group = QGroupBox("贴卡设置")
+        card_layout = QFormLayout()
+        
+        self.card_width_spin = QSpinBox()
+        self.card_width_spin.setRange(200, 800)
+        self.card_width_spin.setValue(300)
+        self.card_width_spin.setSuffix(" px")
+        card_layout.addRow("默认宽度:", self.card_width_spin)
+        
+        # 高度设置（带自动选项）
+        height_layout = QHBoxLayout()
+        self.card_height_spin = QSpinBox()
+        self.card_height_spin.setRange(100, 600)
+        self.card_height_spin.setValue(200)
+        self.card_height_spin.setSuffix(" px")
+        height_layout.addWidget(self.card_height_spin)
+        
+        self.auto_height_check = QCheckBox("自动")
+        self.auto_height_check.setToolTip("根据内容自动调整高度")
+        self.auto_height_check.toggled.connect(self._on_auto_height_toggled)
+        height_layout.addWidget(self.auto_height_check)
+        
+        card_layout.addRow("默认高度:", height_layout)
+        
+        self.card_opacity_spin = QSpinBox()
+        self.card_opacity_spin.setRange(50, 100)
+        self.card_opacity_spin.setValue(95)
+        self.card_opacity_spin.setSuffix(" %")
+        card_layout.addRow("透明度:", self.card_opacity_spin)
+        
+        # 字体大小
+        self.font_size_spin = QSpinBox()
+        self.font_size_spin.setRange(8, 24)
+        self.font_size_spin.setValue(10)
+        self.font_size_spin.setSuffix(" pt")
+        card_layout.addRow("字体大小:", self.font_size_spin)
+        
+        # 文字颜色
+        font_color_layout = QHBoxLayout()
+        self.font_color_input = QLineEdit()
+        self.font_color_input.setText("#000000")
+        self.font_color_input.setMaxLength(7)
+        font_color_layout.addWidget(self.font_color_input)
+        
+        self.font_color_btn = QPushButton("选择颜色")
+        self.font_color_btn.clicked.connect(self._choose_font_color)
+        font_color_layout.addWidget(self.font_color_btn)
+        card_layout.addRow("文字颜色:", font_color_layout)
+        
+        # 背景颜色
+        bg_color_layout = QHBoxLayout()
+        self.bg_color_input = QLineEdit()
+        self.bg_color_input.setText("#FFFFFF")
+        self.bg_color_input.setMaxLength(7)
+        bg_color_layout.addWidget(self.bg_color_input)
+        
+        self.bg_color_btn = QPushButton("选择颜色")
+        self.bg_color_btn.clicked.connect(self._choose_bg_color)
+        bg_color_layout.addWidget(self.bg_color_btn)
+        card_layout.addRow("背景颜色:", bg_color_layout)
+        
+        card_group.setLayout(card_layout)
+        layout.addWidget(card_group)
+        
+        # 历史记录
+        history_group = QGroupBox("历史记录")
+        history_layout = QFormLayout()
+        
+        self.max_history_spin = QSpinBox()
+        self.max_history_spin.setRange(10, 500)
+        self.max_history_spin.setValue(50)
+        self.max_history_spin.setSuffix(" 条")
+        history_layout.addRow("最大保存数量:", self.max_history_spin)
+        
+        history_group.setLayout(history_layout)
+        layout.addWidget(history_group)
+        
+        layout.addStretch()
+        return widget
+    
+    def _create_hotkey_tab(self):
+        """创建快捷键设置标签"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        info_label = QLabel("设置全局快捷键以快速创建贴卡")
+        info_label.setStyleSheet("color: #666; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+        
+        hotkey_group = QGroupBox("快捷键设置")
+        hotkey_layout = QFormLayout()
+        
+        # 使用自定义快捷键输入控件
+        self.hotkey_input = HotkeyEdit()
+        self.hotkey_input.setHotkey("F4")
+        
+        # 连接快捷键改变信号
+        self.hotkey_input.hotkeyChanged.connect(self._on_hotkey_input_changed)
+        
+        hotkey_layout.addRow("贴卡快捷键:", self.hotkey_input)
+        
+        # 清除按钮
+        clear_hotkey_btn = QPushButton("清除")
+        clear_hotkey_btn.clicked.connect(self.hotkey_input.clearHotkey)
+        hotkey_layout.addRow("", clear_hotkey_btn)
+        
+        hotkey_hint = QLabel("点击输入框后按下快捷键组合\n支持: F1-F12, Ctrl+X, Alt+X, Shift+X 等")
+        hotkey_hint.setStyleSheet("color: #999; font-size: 10px;")
+        hotkey_layout.addRow("提示:", hotkey_hint)
+        
+        hotkey_group.setLayout(hotkey_layout)
+        layout.addWidget(hotkey_group)
+        
+        # 快捷键列表
+        shortcuts_group = QGroupBox("其他快捷键")
+        shortcuts_layout = QVBoxLayout()
+        
+        shortcuts_text = """
+        F4 - 创建新贴卡
+        Esc - 关闭当前贴卡
+        Ctrl+C - 复制贴卡内容
+        Ctrl+W - 关闭贴卡
+        """
+        
+        shortcuts_label = QLabel(shortcuts_text)
+        shortcuts_label.setStyleSheet("color: #666; padding: 10px;")
+        shortcuts_layout.addWidget(shortcuts_label)
+        
+        shortcuts_group.setLayout(shortcuts_layout)
+        layout.addWidget(shortcuts_group)
+        
+        layout.addStretch()
+        return widget
+    
+    def _create_history_tab(self):
+        """创建历史记录标签"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        
+        # 历史列表
+        self.history_list = QListWidget()
+        self._load_history()
+        layout.addWidget(self.history_list)
+        
+        # 操作按钮
+        button_layout = QHBoxLayout()
+        
+        self.load_history_btn = QPushButton("加载到贴卡")
+        self.load_history_btn.clicked.connect(self._load_history_to_card)
+        
+        self.delete_history_btn = QPushButton("删除")
+        self.delete_history_btn.clicked.connect(self._delete_history)
+        
+        self.clear_history_btn = QPushButton("清空全部")
+        self.clear_history_btn.clicked.connect(self._clear_history)
+        
+        button_layout.addWidget(self.load_history_btn)
+        button_layout.addWidget(self.delete_history_btn)
+        button_layout.addStretch()
+        button_layout.addWidget(self.clear_history_btn)
+        
+        layout.addLayout(button_layout)
+        
+        return widget
+    
+    def _create_about_tab(self):
+        """创建关于标签"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # 应用图标/名称
+        title_label = QLabel("📋 TextPin")
+        title_label.setFont(QFont("", 24, QFont.Weight.Bold))
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title_label)
+        
+        # 版本
+        version_label = QLabel("版本 2.0.0")
+        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(version_label)
+        
+        # 描述
+        desc_label = QLabel(
+            "轻量级桌面贴卡工具\n"
+            "支持剪贴板监听、卡片贴图、历史记录管理\n\n"
+            "技术栈: Python + PyQt6"
+        )
+        desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc_label.setStyleSheet("color: #666; margin: 20px;")
+        layout.addWidget(desc_label)
+        
+        # 版权
+        copyright_label = QLabel("© 2025 TextPin")
+        copyright_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        copyright_label.setStyleSheet("color: #999; margin-top: 20px;")
+        layout.addWidget(copyright_label)
+        
+        layout.addStretch()
+        return widget
+    
+    def _init_system_tray(self):
+        """初始化系统托盘"""
+        self.tray_icon = QSystemTrayIcon(self)
+        
+        # 创建简单的图标（使用系统图标）
+        from PyQt6.QtWidgets import QStyle
+        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
+        self.tray_icon.setIcon(icon)
+        
+        # 设置提示文字
+        self.tray_icon.setToolTip("TextPin 2.0 - 文字贴卡工具")
+        
+        # 托盘菜单
+        tray_menu = QMenu()
+        
+        # 显示设置
+        show_action = QAction("⚙️ 显示设置", self)
+        show_action.triggered.connect(self._show_settings)
+        tray_menu.addAction(show_action)
+        
+        # 创建贴卡
+        create_card_action = QAction("📋 创建贴卡 (F4)", self)
+        create_card_action.triggered.connect(self._create_card_from_tray)
+        tray_menu.addAction(create_card_action)
+        
+        tray_menu.addSeparator()
+        
+        # 关于
+        about_action = QAction("ℹ️ 关于", self)
+        about_action.triggered.connect(self._on_about)
+        tray_menu.addAction(about_action)
+        
+        tray_menu.addSeparator()
+        
+        # 退出
+        quit_action = QAction("❌ 退出", self)
+        quit_action.triggered.connect(self._quit_app)
+        tray_menu.addAction(quit_action)
+        
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self._tray_activated)
+        
+        # 显示托盘图标
+        self.tray_icon.show()
+        
+        # 显示托盘消息
+        self.tray_icon.showMessage(
+            "TextPin 2.0",
+            "程序已启动，按 F4 创建贴卡",
+            QSystemTrayIcon.MessageIcon.Information,
+            2000
+        )
+    
+    def _tray_activated(self, reason):
+        """托盘图标激活"""
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self._show_settings()
+    
+    def _show_settings(self):
+        """显示设置窗口"""
+        self.show()
+        self.raise_()
+        self.activateWindow()
+    
+    def _create_card_from_tray(self):
+        """从托盘创建贴卡"""
+        print("从托盘创建贴卡")
+        self.create_card_requested.emit()
+    
+    def _on_about(self):
+        """关于对话框"""
+        QMessageBox.about(
+            self,
+            "关于 TextPin",
+            "<h2>📋 TextPin 2.0</h2>"
+            "<p>版本 2.0.0</p>"
+            "<p>轻量级桌面贴卡工具</p>"
+            "<p>支持剪贴板监听、卡片贴图、历史记录管理</p>"
+            "<br>"
+            "<p>技术栈: Python + PyQt6</p>"
+            "<p>© 2025 TextPin</p>"
+        )
+    
+    def _choose_font_color(self):
+        """选择文字颜色"""
+        from PyQt6.QtWidgets import QColorDialog
+        from PyQt6.QtGui import QColor
+        
+        current_color = QColor(self.font_color_input.text())
+        color = QColorDialog.getColor(current_color, self, "选择文字颜色")
+        
+        if color.isValid():
+            self.font_color_input.setText(color.name())
+    
+    def _choose_bg_color(self):
+        """选择背景颜色"""
+        from PyQt6.QtWidgets import QColorDialog
+        from PyQt6.QtGui import QColor
+        
+        current_color = QColor(self.bg_color_input.text())
+        color = QColorDialog.getColor(current_color, self, "选择背景颜色")
+        
+        if color.isValid():
+            self.bg_color_input.setText(color.name())
+    
+    def _on_auto_height_toggled(self, checked):
+        """自动高度选项切换"""
+        self.card_height_spin.setEnabled(not checked)
+    
+    def _load_settings(self):
+        """加载设置"""
+        # 常规设置
+        self.auto_monitor_check.setChecked(
+            self.config.get('clipboard.auto_monitor', True)
+        )
+        self.ignore_self_check.setChecked(
+            self.config.get('clipboard.ignore_self', True)
+        )
+        
+        # 贴卡设置
+        self.card_width_spin.setValue(
+            self.config.get('card.default_width', 300)
+        )
+        self.card_height_spin.setValue(
+            self.config.get('card.default_height', 200)
+        )
+        auto_height = self.config.get('card.auto_height', False)
+        self.auto_height_check.setChecked(auto_height)
+        self.card_height_spin.setEnabled(not auto_height)
+        
+        self.card_opacity_spin.setValue(
+            int(self.config.get('card.opacity', 0.95) * 100)
+        )
+        self.font_size_spin.setValue(
+            self.config.get('card.font_size', 10)
+        )
+        self.font_color_input.setText(
+            self.config.get('card.font_color', '#000000')
+        )
+        self.bg_color_input.setText(
+            self.config.get('card.bg_color', '#FFFFFF')
+        )
+        
+        # 历史记录
+        self.max_history_spin.setValue(
+            self.config.get('clipboard.max_history', 50)
+        )
+        
+        # 快捷键
+        self.hotkey_input.setHotkey(
+            self.config.get('hotkey.create_card', 'F4')
+        )
+        
+        # 窗口位置
+        width = self.config.get('settings_window.width', 600)
+        height = self.config.get('settings_window.height', 500)
+        
+        # 检查是否有保存的位置
+        x = self.config.get('settings_window.x', None)
+        y = self.config.get('settings_window.y', None)
+        
+        if x is not None and y is not None:
+            # 使用保存的位置
+            self.setGeometry(x, y, width, height)
+        else:
+            # 首次打开，居中显示
+            self.resize(width, height)
+            from PyQt6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen().geometry()
+            x = (screen.width() - width) // 2
+            y = (screen.height() - height) // 2
+            self.move(x, y)
+    
+    def _apply_settings(self, show_message=True):
+        """应用设置 - 立即生效"""
+        # 获取旧值
+        old_auto_monitor = self.config.get('clipboard.auto_monitor', True)
+        old_ignore_self = self.config.get('clipboard.ignore_self', True)
+        old_hotkey = self.config.get('hotkey.create_card', 'F4')
+        old_width = self.config.get('card.default_width', 300)
+        old_height = self.config.get('card.default_height', 200)
+        old_opacity = self.config.get('card.opacity', 0.95)
+        
+        # 保存常规设置
+        new_auto_monitor = self.auto_monitor_check.isChecked()
+        new_ignore_self = self.ignore_self_check.isChecked()
+        
+        self.config.set('clipboard.auto_monitor', new_auto_monitor)
+        self.config.set('clipboard.ignore_self', new_ignore_self)
+        
+        # 保存贴卡设置
+        new_width = self.card_width_spin.value()
+        new_height = self.card_height_spin.value()
+        new_opacity = self.card_opacity_spin.value() / 100.0
+        new_font_size = self.font_size_spin.value()
+        new_font_color = self.font_color_input.text()
+        new_bg_color = self.bg_color_input.text()
+        
+        old_font_size = self.config.get('card.font_size', 10)
+        old_font_color = self.config.get('card.font_color', '#000000')
+        old_bg_color = self.config.get('card.bg_color', '#FFFFFF')
+        
+        self.config.set('card.default_width', new_width)
+        self.config.set('card.default_height', new_height)
+        auto_height_value = self.auto_height_check.isChecked()
+        self.config.set('card.auto_height', auto_height_value)
+        print(f"✓ 保存配置: card.auto_height = {auto_height_value}")
+        self.config.set('card.opacity', new_opacity)
+        self.config.set('card.font_size', new_font_size)
+        self.config.set('card.font_color', new_font_color)
+        self.config.set('card.bg_color', new_bg_color)
+        
+        # 保存历史记录设置
+        self.config.set('clipboard.max_history', self.max_history_spin.value())
+        
+        # 保存快捷键
+        new_hotkey = self.hotkey_input.getHotkey()
+        if new_hotkey:
+            self.config.set('hotkey.create_card', new_hotkey)
+        
+        # 只在设置真正改变时才发出信号
+        if new_auto_monitor != old_auto_monitor:
+            self.auto_monitor_changed.emit(new_auto_monitor)
+        
+        if new_ignore_self != old_ignore_self:
+            self.ignore_self_changed.emit(new_ignore_self)
+        
+        if new_hotkey and new_hotkey != old_hotkey:
+            self.hotkey_changed.emit(new_hotkey)
+        
+        # 贴卡样式改变 - 应用到所有现有贴卡
+        if (new_width != old_width or new_height != old_height or new_opacity != old_opacity):
+            self.card_style_changed.emit(new_width, new_height, new_opacity)
+        
+        # 贴卡外观改变 - 应用到所有现有贴卡
+        if (new_font_size != old_font_size or new_font_color != old_font_color or new_bg_color != old_bg_color):
+            self.card_appearance_changed.emit(new_font_size, new_font_color, new_bg_color)
+        
+        # 只在需要时显示提示
+        if show_message:
+            QMessageBox.information(self, "设置", "应用成功！")
+    
+    def _on_hotkey_input_changed(self, hotkey):
+        """快捷键输入改变"""
+        print(f"快捷键已更改为: {hotkey}")
+    
+    def _ok_clicked(self):
+        """确定按钮"""
+        self._apply_settings(show_message=False)  # 确定按钮不显示提示
+        self.hide()
+    
+    def _load_history(self):
+        """加载历史记录"""
+        self.history_list.clear()
+        records = self.storage.get_history(50)
+        
+        for record in records:
+            preview = record['content'][:100]
+            if len(record['content']) > 100:
+                preview += "..."
+            self.history_list.addItem(preview)
+            # 存储完整记录ID
+            item = self.history_list.item(self.history_list.count() - 1)
+            item.setData(Qt.ItemDataRole.UserRole, record['id'])
+    
+    def refresh_history(self):
+        """刷新历史记录（实时更新）"""
+        # 保存当前选中项
+        current_row = self.history_list.currentRow()
+        
+        # 重新加载历史
+        self._load_history()
+        
+        # 恢复选中（如果还有效）
+        if current_row >= 0 and current_row < self.history_list.count():
+            self.history_list.setCurrentRow(current_row)
+    
+    def _load_history_to_card(self):
+        """加载历史到贴卡"""
+        current_item = self.history_list.currentItem()
+        if current_item:
+            history_id = current_item.data(Qt.ItemDataRole.UserRole)
+            record = self.storage.get_history_by_id(history_id)
+            if record:
+                # 发送信号，让主应用创建贴卡
+                self.load_to_card_requested.emit(record['content'])
+                QMessageBox.information(self, "提示", "已加载到新贴卡")
+    
+    def _delete_history(self):
+        """删除历史记录"""
+        current_item = self.history_list.currentItem()
+        if current_item:
+            history_id = current_item.data(Qt.ItemDataRole.UserRole)
+            self.storage.delete_history(history_id)
+            self._load_history()
+    
+    def _clear_history(self):
+        """清空历史记录"""
+        reply = QMessageBox.question(
+            self, "确认", "确定要清空所有历史记录吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.storage.clear_history(keep_favorites=False)
+            self._load_history()
+    
+    def _quit_app(self):
+        """退出应用"""
+        from PyQt6.QtWidgets import QApplication
+        QApplication.quit()
+    
+    def closeEvent(self, event):
+        """关闭事件 - 最小化到托盘"""
+        event.ignore()
+        self.hide()
+        
+        # 保存窗口位置
+        self.config.set('settings_window.x', self.x())
+        self.config.set('settings_window.y', self.y())
+        self.config.set('settings_window.width', self.width())
+        self.config.set('settings_window.height', self.height())

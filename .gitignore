@@ -1,0 +1,210 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.env
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.spyderproject
+.spyproject
+.ropeproject
+
+# Application Data
+textpin.db
+*.sqlite
+*.sqlite3
+config.json
+*.json.bak
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Logs
+*.log
+*.tmp
+*.temp
+temp/
+tmp/
+*.pid
+*.seed
+*.pid.lock
+
+# Cache and coverage
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+.mypy_cache/
+
+# Distribution / packaging
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+
+# Pyre type checker
+.pyre/
+
+# 项目特定忽略
+# 临时备份文件
+*.orig
+*.rej
+*.old
+*.backup
+
+# 本地开发文件
+local_settings.py
+dev_settings.py
+
+# 敏感信息（如果有的话）
+secrets.json
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Windows 特定
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS 特定
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux 特定
+*~
+lost+found
+.networktrash
+
+# 文件系统
+lost+found
+
+# 网络驱动器
+.networktrash
+
+# 项目运行时可能生成的临时文件
+*.tmp
+*.temp
+temp/
+tmp/
+*.pid
+
+# 其他可能不需要的文件类型
+*.bak
+*.backup
+*.old
+*.orig
