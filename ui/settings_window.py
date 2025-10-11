@@ -4,7 +4,8 @@
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QPushButton, QCheckBox, QSpinBox, 
                              QGroupBox, QFormLayout, QLineEdit, QTabWidget,
-                             QListWidget, QMessageBox, QSystemTrayIcon, QMenu, QComboBox)
+                             QListWidget, QMessageBox, QSystemTrayIcon, QMenu, QComboBox,
+                             QDialog)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QAction, QIcon, QKeySequence
 from core import StorageManager
@@ -39,7 +40,7 @@ class SettingsWindow(QMainWindow):
     def _init_ui(self):
         """初始化UI"""
         self.setWindowTitle("TextPin - 设置")
-        self.setMinimumSize(600, 600)
+        self.setMinimumSize(600, 700)
         
         # 中心部件
         central_widget = QWidget()
@@ -216,12 +217,24 @@ class SettingsWindow(QMainWindow):
         
         # 全局快捷键
         global_hotkey_group = QGroupBox("全局快捷键")
-        global_hotkey_layout = QFormLayout()
+        global_hotkey_layout = QHBoxLayout()
         
-        self.hotkey_input = HotkeyEdit()
-        self.hotkey_input.setHotkey("F4")
-        self.hotkey_input.hotkeyChanged.connect(self._on_hotkey_input_changed)
-        global_hotkey_layout.addRow("创建贴卡:", self.hotkey_input)
+        global_hotkey_layout.addWidget(QLabel("创建贴卡:"))
+        
+        self.global_hotkey_edit = QLineEdit()
+        self.global_hotkey_edit.setText("F4")
+        self.global_hotkey_edit.setPlaceholderText("点击设置")
+        self.global_hotkey_edit.setReadOnly(True)
+        self.global_hotkey_edit.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.global_hotkey_edit.mousePressEvent = lambda e: self._set_global_hotkey()
+        global_hotkey_layout.addWidget(self.global_hotkey_edit)
+        
+        clear_global_btn = QPushButton("清除")
+        clear_global_btn.setMaximumWidth(60)
+        clear_global_btn.clicked.connect(lambda: self.global_hotkey_edit.setText(""))
+        global_hotkey_layout.addWidget(clear_global_btn)
+        
+        global_hotkey_layout.addStretch()
         
         global_hotkey_group.setLayout(global_hotkey_layout)
         layout.addWidget(global_hotkey_group)
@@ -260,8 +273,11 @@ class SettingsWindow(QMainWindow):
             # 快捷键输入
             shortcut_edit = QLineEdit()
             shortcut_edit.setText(default_shortcut)
-            shortcut_edit.setPlaceholderText("快捷键（可选）")
+            shortcut_edit.setPlaceholderText("点击设置")
+            shortcut_edit.setReadOnly(True)
             shortcut_edit.setMaximumWidth(150)
+            shortcut_edit.setCursor(Qt.CursorShape.PointingHandCursor)
+            shortcut_edit.mousePressEvent = lambda e, fid=feature_id: self._set_feature_shortcut(fid)
             self.feature_shortcuts[feature_id] = shortcut_edit
             feature_layout.addWidget(shortcut_edit, 1)
             
@@ -271,8 +287,47 @@ class SettingsWindow(QMainWindow):
         scroll_area.setWidget(scroll_content)
         features_layout.addWidget(scroll_area)
         
+        # 快捷键格式说明
+        hint_label = QLabel(
+            "💡 快捷键格式示例：Ctrl+S, Alt+X, Shift+F, F1-F12, Ctrl+Shift+A\n"
+            "留空表示不设置快捷键，只在右键菜单中显示"
+        )
+        hint_label.setStyleSheet("color: #666; font-size: 10px; padding: 5px; background: #f0f0f0; border-radius: 3px;")
+        hint_label.setWordWrap(True)
+        features_layout.addWidget(hint_label)
+        
         features_group.setLayout(features_layout)
         layout.addWidget(features_group)
+        
+        # 自定义规则
+        custom_rules_group = QGroupBox("自定义规则")
+        custom_rules_layout = QVBoxLayout()
+        
+        # 规则列表
+        self.custom_rules_list = QListWidget()
+        self.custom_rules_list.setMaximumHeight(150)
+        custom_rules_layout.addWidget(self.custom_rules_list)
+        
+        # 按钮
+        custom_buttons_layout = QHBoxLayout()
+        
+        add_rule_btn = QPushButton("+ 新建规则")
+        add_rule_btn.clicked.connect(self._add_custom_rule)
+        custom_buttons_layout.addWidget(add_rule_btn)
+        
+        edit_rule_btn = QPushButton("✏️ 编辑")
+        edit_rule_btn.clicked.connect(self._edit_custom_rule)
+        custom_buttons_layout.addWidget(edit_rule_btn)
+        
+        delete_rule_btn = QPushButton("🗑️ 删除")
+        delete_rule_btn.clicked.connect(self._delete_custom_rule)
+        custom_buttons_layout.addWidget(delete_rule_btn)
+        
+        custom_buttons_layout.addStretch()
+        custom_rules_layout.addLayout(custom_buttons_layout)
+        
+        custom_rules_group.setLayout(custom_rules_layout)
+        layout.addWidget(custom_rules_group)
         
         layout.addStretch()
         return widget
@@ -499,7 +554,7 @@ class SettingsWindow(QMainWindow):
         )
         
         # 快捷键
-        self.hotkey_input.setHotkey(
+        self.global_hotkey_edit.setText(
             self.config.get('hotkey.create_card', 'F4')
         )
         
@@ -516,6 +571,9 @@ class SettingsWindow(QMainWindow):
         for feature_id, shortcut_edit in self.feature_shortcuts.items():
             if feature_id in shortcuts:
                 shortcut_edit.setText(shortcuts[feature_id])
+        
+        # 加载自定义规则
+        self._load_custom_rules()
         
         # 窗口位置
         width = self.config.get('settings_window.width', 600)
@@ -583,7 +641,7 @@ class SettingsWindow(QMainWindow):
         self.config.set('clipboard.max_history', self.max_history_spin.value())
         
         # 保存快捷键
-        new_hotkey = self.hotkey_input.getHotkey()
+        new_hotkey = self.global_hotkey_edit.text().strip()
         if new_hotkey:
             self.config.set('hotkey.create_card', new_hotkey)
         
@@ -629,10 +687,6 @@ class SettingsWindow(QMainWindow):
         # 只在需要时显示提示
         if show_message:
             QMessageBox.information(self, "设置", "应用成功！")
-    
-    def _on_hotkey_input_changed(self, hotkey):
-        """快捷键输入改变"""
-        print(f"快捷键已更改为: {hotkey}")
     
     def _ok_clicked(self):
         """确定按钮"""
@@ -698,6 +752,156 @@ class SettingsWindow(QMainWindow):
         """退出应用"""
         from PyQt6.QtWidgets import QApplication
         QApplication.quit()
+    
+    def _load_custom_rules(self):
+        """加载自定义规则列表"""
+        self.custom_rules_list.clear()
+        
+        # 断开信号，避免加载时触发
+        try:
+            self.custom_rules_list.itemChanged.disconnect(self._on_rule_check_changed)
+        except:
+            pass
+        
+        custom_rules = self.config.get('custom_rules', [])
+        for rule in custom_rules:
+            icon = rule.get('icon', '🧰')
+            name = rule.get('name', '未命名')
+            enabled = rule.get('enabled', True)
+            shortcut = rule.get('shortcut', '')
+            
+            item_text = f"{icon} {name}"
+            if shortcut:
+                item_text += f"  ({shortcut})"
+            
+            from PyQt6.QtWidgets import QListWidgetItem
+            item = QListWidgetItem(item_text)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked if enabled else Qt.CheckState.Unchecked)
+            item.setData(Qt.ItemDataRole.UserRole, rule)
+            self.custom_rules_list.addItem(item)
+        
+        # 重新连接信号
+        self.custom_rules_list.itemChanged.connect(self._on_rule_check_changed)
+    
+    def _on_rule_check_changed(self, item):
+        """规则复选框状态改变"""
+        rule = item.data(Qt.ItemDataRole.UserRole)
+        rule['enabled'] = (item.checkState() == Qt.CheckState.Checked)
+        
+        # 更新配置
+        custom_rules = self.config.get('custom_rules', [])
+        for i, r in enumerate(custom_rules):
+            if r.get('id') == rule['id']:
+                custom_rules[i] = rule
+                break
+        
+        self.config.set('custom_rules', custom_rules)
+        
+        # 通知所有贴卡重新加载配置
+        self.menu_config_changed.emit()
+        
+        rule_name = rule.get('name', '未命名')
+        status = "已启用" if rule['enabled'] else "已禁用"
+        print(f"✓ 规则 '{rule_name}' {status}")
+    
+    def _set_global_hotkey(self):
+        """设置全局快捷键"""
+        from .shortcut_capture_dialog import ShortcutCaptureDialog
+        
+        current_shortcut = self.global_hotkey_edit.text()
+        dialog = ShortcutCaptureDialog(current_shortcut=current_shortcut, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            shortcut = dialog.get_shortcut()
+            self.global_hotkey_edit.setText(shortcut)
+    
+    def _set_feature_shortcut(self, feature_id):
+        """设置功能快捷键"""
+        from .shortcut_capture_dialog import ShortcutCaptureDialog
+        
+        shortcut_edit = self.feature_shortcuts.get(feature_id)
+        if not shortcut_edit:
+            return
+        
+        current_shortcut = shortcut_edit.text()
+        dialog = ShortcutCaptureDialog(current_shortcut=current_shortcut, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            shortcut = dialog.get_shortcut()
+            shortcut_edit.setText(shortcut)
+    
+    def _add_custom_rule(self):
+        """新建自定义规则"""
+        from .custom_rule_dialog import CustomRuleDialog
+        
+        dialog = CustomRuleDialog(parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            rule = dialog.get_rule()
+            
+            # 保存到配置
+            custom_rules = self.config.get('custom_rules', [])
+            custom_rules.append(rule)
+            self.config.set('custom_rules', custom_rules)
+            
+            # 刷新列表
+            self._load_custom_rules()
+            
+            QMessageBox.information(self, "成功", f"规则 '{rule['name']}' 已创建")
+    
+    def _edit_custom_rule(self):
+        """编辑自定义规则"""
+        current_item = self.custom_rules_list.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "提示", "请先选择一个规则")
+            return
+        
+        from .custom_rule_dialog import CustomRuleDialog
+        
+        rule = current_item.data(Qt.ItemDataRole.UserRole)
+        dialog = CustomRuleDialog(rule=rule, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            updated_rule = dialog.get_rule()
+            
+            # 更新配置
+            custom_rules = self.config.get('custom_rules', [])
+            for i, r in enumerate(custom_rules):
+                if r.get('id') == updated_rule['id']:
+                    custom_rules[i] = updated_rule
+                    break
+            
+            self.config.set('custom_rules', custom_rules)
+            
+            # 刷新列表
+            self._load_custom_rules()
+            
+            QMessageBox.information(self, "成功", f"规则 '{updated_rule['name']}' 已更新")
+    
+    def _delete_custom_rule(self):
+        """删除自定义规则"""
+        current_item = self.custom_rules_list.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "提示", "请先选择一个规则")
+            return
+        
+        rule = current_item.data(Qt.ItemDataRole.UserRole)
+        rule_name = rule.get('name', '未命名')
+        
+        reply = QMessageBox.question(
+            self,
+            "确认删除",
+            f"确定要删除规则 '{rule_name}' 吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            # 从配置中删除
+            custom_rules = self.config.get('custom_rules', [])
+            custom_rules = [r for r in custom_rules if r.get('id') != rule['id']]
+            self.config.set('custom_rules', custom_rules)
+            
+            # 刷新列表
+            self._load_custom_rules()
+            
+            QMessageBox.information(self, "成功", f"规则 '{rule_name}' 已删除")
     
     def closeEvent(self, event):
         """关闭事件 - 最小化到托盘"""

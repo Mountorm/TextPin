@@ -60,7 +60,11 @@ class CardWindow(QWidget):
         # 固定状态
         self.is_pinned = False
         
+        # 快捷键列表（用于管理和清理）
+        self.shortcuts = []
+        
         self._init_ui()
+        self._register_shortcuts()
         self._apply_style()
         
         # 启用鼠标追踪以实时更新光标样式
@@ -425,13 +429,126 @@ class CardWindow(QWidget):
             
             menu.addAction(action)
         
+        # 添加自定义规则
+        custom_rules = self.config.get('custom_rules', [])
+        enabled_custom_rules = [r for r in custom_rules if r.get('enabled', True)]
+        
+        if enabled_custom_rules:
+            menu.addSeparator()
+            menu.addAction("─ 自定义规则 ─").setEnabled(False)
+            
+            for rule in enabled_custom_rules:
+                icon = rule.get('icon', '🧰')
+                name = rule.get('name', '未命名')
+                shortcut = rule.get('shortcut', '')
+                
+                action = QAction(f"{icon} {name}", self)
+                if shortcut:
+                    action.setShortcut(shortcut)
+                
+                # 使用 lambda 捕获 rule，避免闭包问题
+                action.triggered.connect(lambda checked=False, r=rule: self._execute_custom_rule(r))
+                menu.addAction(action)
+        
         # 在鼠标位置显示菜单
         menu.exec(self.text_edit.mapToGlobal(pos))
     
+    def _register_shortcuts(self):
+        """注册所有快捷键"""
+        from PyQt6.QtGui import QShortcut, QKeySequence
+        
+        # 清除旧的快捷键
+        for shortcut in self.shortcuts:
+            shortcut.setEnabled(False)
+            shortcut.deleteLater()
+        self.shortcuts.clear()
+        
+        # 获取快捷键配置
+        shortcuts_config = self.config.get('menu.shortcuts', {})
+        enabled_features = self.config.get('menu.enabled_features', None)
+        if enabled_features is None:
+            enabled_features = [f[0] for f in self.MENU_FEATURES]
+        
+        # 为每个启用的功能注册快捷键
+        for feature_id, name, icon, default_shortcut, method_name, tooltip in self.MENU_FEATURES:
+            # 跳过分隔符和未启用的功能
+            if feature_id.startswith('separator') or feature_id not in enabled_features:
+                continue
+            
+            # 获取快捷键（优先使用用户配置，否则使用默认）
+            shortcut_key = shortcuts_config.get(feature_id, default_shortcut)
+            if not shortcut_key:
+                continue
+            
+            # 获取方法
+            if method_name == 'close':
+                method = self.close
+            elif method_name == '_toggle_pin':
+                # 使用专门的切换方法
+                method = self._shortcut_toggle_pin
+            else:
+                method = getattr(self, method_name, None)
+            
+            if method:
+                # 创建快捷键
+                shortcut = QShortcut(QKeySequence(shortcut_key), self)
+                shortcut.activated.connect(method)
+                self.shortcuts.append(shortcut)
+                print(f"✓ 注册快捷键: {name} = {shortcut_key}")
+        
+        # 注册自定义规则的快捷键
+        custom_rules = self.config.get('custom_rules', [])
+        for rule in custom_rules:
+            if not rule.get('enabled', True):
+                continue
+            
+            shortcut_key = rule.get('shortcut', '')
+            if not shortcut_key:
+                continue
+            
+            rule_name = rule.get('name', '未命名')
+            shortcut = QShortcut(QKeySequence(shortcut_key), self)
+            shortcut.activated.connect(lambda r=rule: self._execute_custom_rule(r))
+            self.shortcuts.append(shortcut)
+            print(f"✓ 注册自定义规则快捷键: {rule_name} = {shortcut_key}")
+    
+    def _shortcut_toggle_pin(self):
+        """快捷键触发的固定切换（不需要 checked 参数）"""
+        self._toggle_pin(not self.is_pinned)
+    
+    def _execute_custom_rule(self, rule):
+        """执行自定义规则"""
+        from core import TextProcessor
+        from PyQt6.QtWidgets import QMessageBox
+        
+        # 获取当前文本
+        text = self.text_edit.toPlainText()
+        
+        if not text:
+            QMessageBox.warning(self, "提示", "文本为空，无需处理")
+            return
+        
+        # 执行处理
+        processor = TextProcessor()
+        try:
+            result = processor.process(text, rule)
+            
+            # 更新文本
+            self.text_edit.clear()
+            self.text_edit.setPlainText(result)
+            
+            rule_name = rule.get('name', '未命名')
+            print(f"✓ 已执行自定义规则: {rule_name}")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"执行规则失败: {str(e)}")
+            print(f"✗ 执行自定义规则失败: {str(e)}")
+    
     def reload_menu_config(self):
         """重新加载菜单配置（用于设置更改后立即生效）"""
-        # 重新读取配置即可，下次打开菜单时会使用新配置
-        pass
+        # 重新注册快捷键
+        self._register_shortcuts()
+        print("✓ 菜单配置已重新加载")
     
     def _toggle_pin(self, checked):
         """固定/取消固定窗口"""
