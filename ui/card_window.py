@@ -15,6 +15,22 @@ class CardWindow(QWidget):
     # 信号
     closed = pyqtSignal()  # 窗口关闭信号
     
+    # 功能定义（id, 名称, 图标, 默认快捷键, 方法名, 提示文字）
+    MENU_FEATURES = [
+        ('copy_all', '复制全部', '📋', '', '_on_copy', '复制所有内容到剪贴板'),
+        ('clear', '清空内容', '🗑️', 'Ctrl+N', '_on_clear', '清空所有内容'),
+        ('clear_format', '清除格式', '🧹', '', '_on_clear_format', '移除所有文本格式，保留纯文本'),
+        ('clear_empty_lines', '清除空行', '📝', '', '_on_clear_empty_lines', '移除所有空白行'),
+        ('separator1', '---', '', '', '', ''),  # 分隔符
+        ('search', '搜索', '🔍', 'Ctrl+F', '_on_search', '查找文本'),
+        ('replace', '替换', '🔄', 'Ctrl+H', '_on_replace', '查找并替换文本'),
+        ('stats', '文本统计', '📊', '', '_show_stats', '显示字符、行数等统计信息'),
+        ('json_format', 'JSON格式化', '{ }', '', '_on_json_format', '格式化JSON内容'),
+        ('separator2', '---', '', '', '', ''),  # 分隔符
+        ('pin', '固定窗口', '📌', 'Ctrl+P', '_toggle_pin', '固定窗口位置和大小'),
+        ('close', '关闭贴卡', '✖', 'Ctrl+W', 'close', '关闭当前贴卡'),
+    ]
+    
     def __init__(self, content="", clipboard_monitor=None, parent=None):
         super().__init__(parent)
         self.content = content
@@ -353,109 +369,69 @@ class CardWindow(QWidget):
             cursor.removeSelectedText()
     
     def _show_context_menu(self, pos):
-        """显示自定义右键菜单"""
+        """显示自定义右键菜单（根据配置动态生成）"""
         from PyQt6.QtWidgets import QMenu
         from PyQt6.QtGui import QAction
         
         menu = QMenu(self)
         
-        # 撤销/重做
-        undo_action = QAction("撤销", self)
-        undo_action.setShortcut("Ctrl+Z")
-        undo_action.triggered.connect(self.text_edit.undo)
-        undo_action.setEnabled(self.text_edit.document().isUndoAvailable())
-        menu.addAction(undo_action)
+        # 获取启用的功能配置
+        enabled_features = self.config.get('menu.enabled_features', None)
+        if enabled_features is None:
+            # 默认全部启用
+            enabled_features = [f[0] for f in self.MENU_FEATURES]
         
-        redo_action = QAction("重做", self)
-        redo_action.setShortcut("Ctrl+Y")
-        redo_action.triggered.connect(self.text_edit.redo)
-        redo_action.setEnabled(self.text_edit.document().isRedoAvailable())
-        menu.addAction(redo_action)
+        # 获取快捷键配置
+        shortcuts = self.config.get('menu.shortcuts', {})
         
-        menu.addSeparator()
-        
-        # 剪切/复制/粘贴
-        cut_action = QAction("剪切", self)
-        cut_action.setShortcut("Ctrl+X")
-        cut_action.triggered.connect(self._handle_cut)
-        cut_action.setEnabled(self.text_edit.textCursor().hasSelection())
-        menu.addAction(cut_action)
-        
-        copy_action = QAction("复制", self)
-        copy_action.setShortcut("Ctrl+C")
-        copy_action.triggered.connect(self._handle_copy)
-        copy_action.setEnabled(self.text_edit.textCursor().hasSelection())
-        menu.addAction(copy_action)
-        
-        paste_action = QAction("粘贴", self)
-        paste_action.setShortcut("Ctrl+V")
-        paste_action.triggered.connect(self.text_edit.paste)
-        menu.addAction(paste_action)
-        
-        delete_action = QAction("删除", self)
-        delete_action.triggered.connect(lambda: self.text_edit.textCursor().removeSelectedText())
-        delete_action.setEnabled(self.text_edit.textCursor().hasSelection())
-        menu.addAction(delete_action)
-        
-        menu.addSeparator()
-        
-        # 全选
-        select_all_action = QAction("全选", self)
-        select_all_action.setShortcut("Ctrl+A")
-        select_all_action.triggered.connect(self.text_edit.selectAll)
-        menu.addAction(select_all_action)
-        
-        menu.addSeparator()
-        
-        # 搜索和替换
-        search_action = QAction("搜索...", self)
-        search_action.setShortcut("Ctrl+F")
-        search_action.triggered.connect(self._on_search)
-        menu.addAction(search_action)
-        
-        replace_action = QAction("替换...", self)
-        replace_action.setShortcut("Ctrl+H")
-        replace_action.triggered.connect(self._on_replace)
-        menu.addAction(replace_action)
-        
-        menu.addSeparator()
-        
-        # 工具功能
-        format_action = QAction("JSON格式化", self)
-        format_action.triggered.connect(self._on_format_json)
-        menu.addAction(format_action)
-        
-        stats_action = QAction("文本统计", self)
-        stats_action.triggered.connect(self._show_stats)
-        menu.addAction(stats_action)
-        
-        menu.addSeparator()
-        
-        # 复制全部内容
-        copy_all_action = QAction("复制全部", self)
-        copy_all_action.triggered.connect(self._on_copy)
-        menu.addAction(copy_all_action)
-        
-        clear_action = QAction("清空内容", self)
-        clear_action.setShortcut("Ctrl+N")
-        clear_action.triggered.connect(self._on_clear)
-        menu.addAction(clear_action)
-        
-        menu.addSeparator()
-        
-        # 窗口控制
-        pin_action = QAction("锁定卡片", self)
-        pin_action.setCheckable(True)
-        pin_action.setChecked(self.is_pinned)
-        pin_action.triggered.connect(self._toggle_pin)
-        menu.addAction(pin_action)
-        
-        close_action = QAction("关闭贴卡", self)
-        close_action.triggered.connect(self.close)
-        menu.addAction(close_action)
+        # 动态生成菜单
+        for feature_id, name, icon, default_shortcut, method_name, tooltip in self.MENU_FEATURES:
+            # 检查是否启用
+            if feature_id not in enabled_features:
+                continue
+            
+            # 分隔符
+            if feature_id.startswith('separator'):
+                menu.addSeparator()
+                continue
+            
+            # 创建动作
+            action_text = f"{icon} {name}" if icon else name
+            action = QAction(action_text, self)
+            
+            # 设置快捷键
+            shortcut = shortcuts.get(feature_id, default_shortcut)
+            if shortcut:
+                action.setShortcut(shortcut)
+            
+            # 设置提示
+            if tooltip:
+                action.setToolTip(tooltip)
+            
+            # 连接方法
+            if method_name:
+                if method_name == 'close':
+                    action.triggered.connect(self.close)
+                elif method_name == '_toggle_pin':
+                    # 固定窗口需要特殊处理（可选中状态）
+                    action.setCheckable(True)
+                    action.setChecked(self.is_pinned)
+                    action.triggered.connect(self._toggle_pin)
+                else:
+                    # 动态获取方法
+                    method = getattr(self, method_name, None)
+                    if method:
+                        action.triggered.connect(method)
+            
+            menu.addAction(action)
         
         # 在鼠标位置显示菜单
         menu.exec(self.text_edit.mapToGlobal(pos))
+    
+    def reload_menu_config(self):
+        """重新加载菜单配置（用于设置更改后立即生效）"""
+        # 重新读取配置即可，下次打开菜单时会使用新配置
+        pass
     
     def _toggle_pin(self, checked):
         """固定/取消固定窗口"""
@@ -481,6 +457,117 @@ class CardWindow(QWidget):
     def _on_clear(self):
         """清空内容"""
         self.text_edit.clear()
+    
+    def _on_clear_format(self):
+        """清除格式 - 移除所有文本格式，保留纯文本"""
+        import html
+        import re
+        
+        # 获取 HTML 格式的内容
+        html_text = self.text_edit.toHtml()
+        
+        # 步骤1: 移除 <style> 标签及其内容（包括 CSS 代码）
+        # 使用 DOTALL 模式让 . 匹配换行符
+        text = re.sub(r'<style[^>]*>.*?</style>', '', html_text, flags=re.DOTALL | re.IGNORECASE)
+        
+        # 步骤2: 移除 <script> 标签及其内容
+        text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
+        
+        # 步骤3: 移除 HTML 注释
+        text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
+        
+        # 步骤4: 先解码 HTML 实体（必须在移除标签前做，否则 &lt;p&gt; 无法被识别）
+        text = html.unescape(text)
+        
+        # 步骤5: 移除所有 HTML 标签（解码后才能正确匹配）
+        text = re.sub(r'<[^>]+>', '', text)
+        
+        # 步骤6: 清除 Markdown 语法
+        # 6.1 移除图片语法 ![alt](url)
+        text = re.sub(r'!\[([^\]]*)\]\([^\)]+\)', r'\1', text)
+        
+        # 6.2 移除链接语法 [text](url) 保留文本
+        text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+        
+        # 6.3 移除代码块 ```code```
+        text = re.sub(r'```[\s\S]*?```', '', text)
+        
+        # 6.4 移除行内代码 `code`
+        text = re.sub(r'`([^`]+)`', r'\1', text)
+        
+        # 6.5 移除粗体 **text** 或 __text__
+        text = re.sub(r'\*\*([^\*]+)\*\*', r'\1', text)
+        text = re.sub(r'__([^_]+)__', r'\1', text)
+        
+        # 6.6 移除斜体 *text* 或 _text_
+        text = re.sub(r'\*([^\*]+)\*', r'\1', text)
+        text = re.sub(r'_([^_]+)_', r'\1', text)
+        
+        # 6.7 移除删除线 ~~text~~
+        text = re.sub(r'~~([^~]+)~~', r'\1', text)
+        
+        # 6.8 移除标题标记 # ## ###
+        text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+        
+        # 6.9 移除引用标记 >
+        text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
+        
+        # 6.10 移除无序列表标记 - 或 * 或 +
+        text = re.sub(r'^[\-\*\+]\s+', '', text, flags=re.MULTILINE)
+        
+        # 6.11 移除有序列表标记 1. 2. 3.
+        text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
+        
+        # 6.12 移除分隔线 --- 或 *** 或 ___
+        text = re.sub(r'^[\-\*_]{3,}\s*$', '', text, flags=re.MULTILINE)
+        
+        # 6.13 移除表格语法（简单处理，移除 | 分隔符）
+        text = re.sub(r'\|', '', text)
+        
+        # 步骤7: 清理空白字符
+        # 移除零宽字符和其他不可见字符
+        text = re.sub(r'[\u200b-\u200f\ufeff]', '', text)
+        
+        # 步骤8: 规范化换行符
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
+        
+        # 步骤9: 压缩多个连续空行为最多两个空行
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+        
+        # 步骤10: 去除每行末尾的空白
+        lines = text.split('\n')
+        cleaned_lines = [line.rstrip() for line in lines]
+        text = '\n'.join(cleaned_lines)
+        
+        # 步骤11: 去除文本首尾空白
+        final_text = text.strip()
+        
+        # 应用清理后的纯文本
+        self.text_edit.clear()
+        self.text_edit.setPlainText(final_text)
+        
+        print(f"✓ 已清除格式，保留纯文本内容（{len(final_text)} 字符）")
+    
+    def _on_clear_empty_lines(self):
+        """清除空行 - 移除所有空白行"""
+        import re
+        
+        # 获取当前文本
+        text = self.text_edit.toPlainText()
+        
+        # 移除所有空白行（包括只有空格/制表符的行）
+        lines = text.split('\n')
+        non_empty_lines = [line for line in lines if line.strip()]
+        
+        # 重新组合文本
+        cleaned_text = '\n'.join(non_empty_lines)
+        
+        # 更新文本
+        self.text_edit.clear()
+        self.text_edit.setPlainText(cleaned_text)
+        
+        removed_count = len(lines) - len(non_empty_lines)
+        print(f"✓ 已清除 {removed_count} 个空行")
     
     def _on_search(self):
         """搜索文本 - 使用统一对话框"""
@@ -520,7 +607,7 @@ class CardWindow(QWidget):
             f"行数: {line_count}"
         )
     
-    def _on_format_json(self):
+    def _on_json_format(self):
         """JSON 格式化"""
         import json
         from PyQt6.QtWidgets import QMessageBox

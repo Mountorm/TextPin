@@ -93,6 +93,9 @@ class AppManager(QObject):
             self.settings_window.load_to_card_requested.connect(
                 self.create_card
             )
+            self.settings_window.menu_config_changed.connect(
+                self._on_menu_config_changed
+            )
         
         self.settings_window.show()
         self.settings_window.raise_()
@@ -161,6 +164,11 @@ class AppManager(QObject):
         # 保存引用并显示
         self.card_windows.append(card)
         card.show()
+        
+        # 设置焦点到新创建的卡片
+        card.activateWindow()  # 激活窗口
+        card.raise_()  # 置于最前
+        card.setFocus()  # 设置焦点
         
         print(f"已创建贴卡，当前贴卡数量: {len(self.card_windows)}")
     
@@ -242,6 +250,17 @@ class AppManager(QObject):
         
         if self.card_windows:
             print(f"✓ 已更新 {len(self.card_windows)} 个贴卡的外观")
+    
+    def _on_menu_config_changed(self):
+        """菜单配置改变 - 立即应用到所有现有贴卡"""
+        print("菜单配置改变，刷新所有贴卡")
+        
+        # 通知所有现有贴卡重新加载菜单配置
+        for card in self.card_windows:
+            card.reload_menu_config()
+        
+        if self.card_windows:
+            print(f"✓ 已刷新 {len(self.card_windows)} 个贴卡的菜单配置")
     
     def cleanup(self):
         """清理资源"""

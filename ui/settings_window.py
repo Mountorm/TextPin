@@ -23,6 +23,7 @@ class SettingsWindow(QMainWindow):
     card_style_changed = pyqtSignal(int, int, float)  # 贴卡样式改变 (width, height, opacity)
     card_appearance_changed = pyqtSignal(int, str, str)  # 贴卡外观改变 (font_size, font_color, bg_color)
     load_to_card_requested = pyqtSignal(str)  # 请求加载内容到贴卡
+    menu_config_changed = pyqtSignal()  # 菜单配置改变
     
     def __init__(self, config=None, storage=None):
         super().__init__()
@@ -58,8 +59,8 @@ class SettingsWindow(QMainWindow):
         # 常规设置
         self.tab_widget.addTab(self._create_general_tab(), "常规")
         
-        # 快捷键设置
-        self.tab_widget.addTab(self._create_hotkey_tab(), "快捷键")
+        # 功能设置（替换原快捷键Tab）
+        self.tab_widget.addTab(self._create_features_tab(), "功能")
         
         # 历史记录
         self.tab_widget.addTab(self._create_history_tab(), "历史记录")
@@ -202,56 +203,76 @@ class SettingsWindow(QMainWindow):
         layout.addStretch()
         return widget
     
-    def _create_hotkey_tab(self):
-        """创建快捷键设置标签"""
+    def _create_features_tab(self):
+        """创建功能设置标签"""
+        from .card_window import CardWindow
+        
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        info_label = QLabel("设置全局快捷键以快速创建贴卡")
+        info_label = QLabel("配置贴卡右键菜单中显示的功能和快捷键")
         info_label.setStyleSheet("color: #666; margin-bottom: 10px;")
         layout.addWidget(info_label)
         
-        hotkey_group = QGroupBox("快捷键设置")
-        hotkey_layout = QFormLayout()
+        # 全局快捷键
+        global_hotkey_group = QGroupBox("全局快捷键")
+        global_hotkey_layout = QFormLayout()
         
-        # 使用自定义快捷键输入控件
         self.hotkey_input = HotkeyEdit()
         self.hotkey_input.setHotkey("F4")
-        
-        # 连接快捷键改变信号
         self.hotkey_input.hotkeyChanged.connect(self._on_hotkey_input_changed)
+        global_hotkey_layout.addRow("创建贴卡:", self.hotkey_input)
         
-        hotkey_layout.addRow("贴卡快捷键:", self.hotkey_input)
+        global_hotkey_group.setLayout(global_hotkey_layout)
+        layout.addWidget(global_hotkey_group)
         
-        # 清除按钮
-        clear_hotkey_btn = QPushButton("清除")
-        clear_hotkey_btn.clicked.connect(self.hotkey_input.clearHotkey)
-        hotkey_layout.addRow("", clear_hotkey_btn)
+        # 功能列表
+        features_group = QGroupBox("右键菜单功能")
+        features_layout = QVBoxLayout()
         
-        hotkey_hint = QLabel("点击输入框后按下快捷键组合\n支持: F1-F12, Ctrl+X, Alt+X, Shift+X 等")
-        hotkey_hint.setStyleSheet("color: #999; font-size: 10px;")
-        hotkey_layout.addRow("提示:", hotkey_hint)
+        # 创建滚动区域
+        from PyQt6.QtWidgets import QScrollArea
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
         
-        hotkey_group.setLayout(hotkey_layout)
-        layout.addWidget(hotkey_group)
+        # 存储功能控件的字典
+        self.feature_checkboxes = {}
+        self.feature_shortcuts = {}
         
-        # 快捷键列表
-        shortcuts_group = QGroupBox("其他快捷键")
-        shortcuts_layout = QVBoxLayout()
+        # 为每个功能创建控件
+        for feature_id, name, icon, default_shortcut, method_name, tooltip in CardWindow.MENU_FEATURES:
+            # 跳过分隔符
+            if feature_id.startswith('separator'):
+                continue
+            
+            # 创建水平布局
+            feature_layout = QHBoxLayout()
+            
+            # 启用复选框
+            checkbox = QCheckBox(f"{icon} {name}")
+            checkbox.setChecked(True)  # 默认启用
+            checkbox.setToolTip(tooltip)
+            self.feature_checkboxes[feature_id] = checkbox
+            feature_layout.addWidget(checkbox, 2)
+            
+            # 快捷键输入
+            shortcut_edit = QLineEdit()
+            shortcut_edit.setText(default_shortcut)
+            shortcut_edit.setPlaceholderText("快捷键（可选）")
+            shortcut_edit.setMaximumWidth(150)
+            self.feature_shortcuts[feature_id] = shortcut_edit
+            feature_layout.addWidget(shortcut_edit, 1)
+            
+            scroll_layout.addLayout(feature_layout)
         
-        shortcuts_text = """
-        F4 - 创建新贴卡
-        Esc - 关闭当前贴卡
-        Ctrl+C - 复制贴卡内容
-        Ctrl+W - 关闭贴卡
-        """
+        scroll_layout.addStretch()
+        scroll_area.setWidget(scroll_content)
+        features_layout.addWidget(scroll_area)
         
-        shortcuts_label = QLabel(shortcuts_text)
-        shortcuts_label.setStyleSheet("color: #666; padding: 10px;")
-        shortcuts_layout.addWidget(shortcuts_label)
-        
-        shortcuts_group.setLayout(shortcuts_layout)
-        layout.addWidget(shortcuts_group)
+        features_group.setLayout(features_layout)
+        layout.addWidget(features_group)
         
         layout.addStretch()
         return widget
@@ -482,6 +503,20 @@ class SettingsWindow(QMainWindow):
             self.config.get('hotkey.create_card', 'F4')
         )
         
+        # 功能配置
+        enabled_features = self.config.get('menu.enabled_features', None)
+        shortcuts = self.config.get('menu.shortcuts', {})
+        
+        # 加载功能启用状态
+        if enabled_features is not None:
+            for feature_id, checkbox in self.feature_checkboxes.items():
+                checkbox.setChecked(feature_id in enabled_features)
+        
+        # 加载快捷键
+        for feature_id, shortcut_edit in self.feature_shortcuts.items():
+            if feature_id in shortcuts:
+                shortcut_edit.setText(shortcuts[feature_id])
+        
         # 窗口位置
         width = self.config.get('settings_window.width', 600)
         height = self.config.get('settings_window.height', 500)
@@ -551,6 +586,25 @@ class SettingsWindow(QMainWindow):
         new_hotkey = self.hotkey_input.getHotkey()
         if new_hotkey:
             self.config.set('hotkey.create_card', new_hotkey)
+        
+        # 保存功能配置
+        enabled_features = []
+        shortcuts = {}
+        
+        for feature_id, checkbox in self.feature_checkboxes.items():
+            if checkbox.isChecked():
+                enabled_features.append(feature_id)
+        
+        for feature_id, shortcut_edit in self.feature_shortcuts.items():
+            shortcut = shortcut_edit.text().strip()
+            if shortcut:
+                shortcuts[feature_id] = shortcut
+        
+        self.config.set('menu.enabled_features', enabled_features)
+        self.config.set('menu.shortcuts', shortcuts)
+        
+        # 发出菜单配置改变信号
+        self.menu_config_changed.emit()
         
         # 只在设置真正改变时才发出信号
         if new_auto_monitor != old_auto_monitor:
