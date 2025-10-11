@@ -21,10 +21,13 @@ class CardWindow(QWidget):
         self.clipboard_monitor = clipboard_monitor  # 剪贴板监听器引用
         self.is_internal_copy = False  # 标记是否是内部复制操作
         
+        # 初始化配置（需要在使用前初始化）
+        from utils import ConfigManager
+        self.config = ConfigManager()
+        
         # 窗口设置
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |  # 无边框
-            Qt.WindowType.WindowStaysOnTopHint |  # 置顶
             Qt.WindowType.Tool  # 工具窗口，不显示在任务栏
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)  # 透明背景
@@ -57,6 +60,7 @@ class CardWindow(QWidget):
         if self.clipboard_monitor:
             self.clipboard_monitor.register_card(self)
         
+        
     def _init_ui(self):
         """初始化UI"""
         # 主布局
@@ -79,14 +83,10 @@ class CardWindow(QWidget):
         self.text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
         # 设置字体（从配置加载）
-        from utils import ConfigManager
-        config = ConfigManager()
-        font_size = config.get('card.font_size', 10)
-        font = QFont("Consolas", font_size)
+        font_size = self.config.get('card.font_size', 10)
+        font_family = self.config.get('card.font_family', 'Consolas')
+        font = QFont(font_family, font_size)
         self.text_edit.setFont(font)
-        
-        # 保存配置引用
-        self.config = config
         
         # 自定义右键菜单
         self.text_edit.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -111,11 +111,13 @@ class CardWindow(QWidget):
         # 设置默认大小
         self.resize(300, 200)
         
+        
     def _apply_style(self):
         """应用样式"""
         # 从配置加载颜色
         font_color = self.config.get('card.font_color', '#000000')
         bg_color = self.config.get('card.bg_color', '#FFFFFF')
+        font_family = self.config.get('card.font_family', 'Consolas')
         
         # 计算半透明背景色
         from PyQt6.QtGui import QColor
@@ -134,6 +136,7 @@ class CardWindow(QWidget):
                 border: none;
                 selection-background-color: #B3D9FF;
                 color: {font_color};
+                font-family: {font_family};
             }}
             
             QPushButton {{
@@ -187,6 +190,11 @@ class CardWindow(QWidget):
     
     def _update_cursor(self, edge):
         """根据边缘更新鼠标样式"""
+        # 如果窗口已固定，不显示调整大小光标
+        if self.is_pinned:
+            self.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
+            return
+            
         if edge == 'bottom_right':
             self.setCursor(QCursor(Qt.CursorShape.SizeFDiagCursor))
         elif edge == 'bottom_left':
@@ -201,6 +209,11 @@ class CardWindow(QWidget):
     def mousePressEvent(self, event):
         """鼠标按下 - 开始拖动或调整大小"""
         if event.button() == Qt.MouseButton.LeftButton:
+            # 如果窗口已固定，禁止拖动和调整大小
+            if self.is_pinned:
+                super().mousePressEvent(event)
+                return
+                
             edge = self._get_resize_edge(event.pos())
             
             if edge:
@@ -306,24 +319,12 @@ class CardWindow(QWidget):
         if text:
             # 使用剪贴板监听器的内部复制方法
             if self.clipboard_monitor:
-                self.clipboard_monitor.set_text(text, is_internal=True)
+                self.clipboard_monitor.set_text(text, mark_internal=True)
             else:
                 pyperclip.copy(text)
             
-            # 短暂提示
-            original_text = self.copy_btn.text()
-            self.copy_btn.setText("✓ 已复制")
-            self.copy_btn.setEnabled(False)
-            
-            # 500ms 后恢复
-            from PyQt6.QtCore import QTimer
-            QTimer.singleShot(500, lambda: self._reset_copy_button(original_text))
-    
-    def _reset_copy_button(self, text):
-        """重置复制按钮"""
-        self.copy_btn.setText(text)
-        self.copy_btn.setEnabled(True)
-        self.is_internal_copy = False
+            # 简单提示（无按钮版本）
+            print("✓ 已复制全部内容到剪贴板")
     
     def _handle_copy(self):
         """处理复制操作（Ctrl+C）"""
@@ -407,12 +408,12 @@ class CardWindow(QWidget):
         menu.addSeparator()
         
         # 搜索和替换
-        search_action = QAction("🔍 搜索...", self)
+        search_action = QAction("搜索...", self)
         search_action.setShortcut("Ctrl+F")
         search_action.triggered.connect(self._on_search)
         menu.addAction(search_action)
         
-        replace_action = QAction("🔄 替换...", self)
+        replace_action = QAction("替换...", self)
         replace_action.setShortcut("Ctrl+H")
         replace_action.triggered.connect(self._on_replace)
         menu.addAction(replace_action)
@@ -420,22 +421,22 @@ class CardWindow(QWidget):
         menu.addSeparator()
         
         # 工具功能
-        format_action = QAction("📋 JSON格式化", self)
+        format_action = QAction("JSON格式化", self)
         format_action.triggered.connect(self._on_format_json)
         menu.addAction(format_action)
         
-        stats_action = QAction("📊 文本统计", self)
+        stats_action = QAction("文本统计", self)
         stats_action.triggered.connect(self._show_stats)
         menu.addAction(stats_action)
         
         menu.addSeparator()
         
         # 复制全部内容
-        copy_all_action = QAction("📄 复制全部到剪贴板", self)
+        copy_all_action = QAction("复制全部", self)
         copy_all_action.triggered.connect(self._on_copy)
         menu.addAction(copy_all_action)
         
-        clear_action = QAction("🗑️ 清空内容", self)
+        clear_action = QAction("清空内容", self)
         clear_action.setShortcut("Ctrl+N")
         clear_action.triggered.connect(self._on_clear)
         menu.addAction(clear_action)
@@ -443,13 +444,13 @@ class CardWindow(QWidget):
         menu.addSeparator()
         
         # 窗口控制
-        pin_action = QAction("📌 固定窗口", self)
+        pin_action = QAction("锁定卡片", self)
         pin_action.setCheckable(True)
         pin_action.setChecked(self.is_pinned)
         pin_action.triggered.connect(self._toggle_pin)
         menu.addAction(pin_action)
         
-        close_action = QAction("✖ 关闭贴卡", self)
+        close_action = QAction("关闭贴卡", self)
         close_action.triggered.connect(self.close)
         menu.addAction(close_action)
         
@@ -460,9 +461,22 @@ class CardWindow(QWidget):
         """固定/取消固定窗口"""
         self.is_pinned = checked
         if checked:
-            print("窗口已固定")
+            # 固定：置顶 + 禁止移动和调整大小
+            self.setWindowFlags(
+                Qt.WindowType.FramelessWindowHint |
+                Qt.WindowType.WindowStaysOnTopHint |  # 置顶
+                Qt.WindowType.Tool
+            )
+            self.show()  # 重新显示窗口以应用标志
+            print("✓ 窗口已固定（置顶 + 锁定位置和大小）")
         else:
-            print("窗口已取消固定")
+            # 取消固定：不置顶 + 允许移动和调整大小
+            self.setWindowFlags(
+                Qt.WindowType.FramelessWindowHint |
+                Qt.WindowType.Tool
+            )
+            self.show()  # 重新显示窗口以应用标志
+            print("✓ 窗口已取消固定（可移动 + 可调整大小）")
     
     def _on_clear(self):
         """清空内容"""
@@ -474,7 +488,7 @@ class CardWindow(QWidget):
         
         dialog = FindReplaceDialog(self.text_edit, self)
         dialog.setWindowTitle("查找")  # 默认为查找模式
-        dialog.exec()
+        dialog.show()  # 使用 show() 而不是 exec() 以允许非模态
     
     def _on_replace(self):
         """查找替换 - 使用统一对话框"""
@@ -483,7 +497,7 @@ class CardWindow(QWidget):
         dialog = FindReplaceDialog(self.text_edit, self)
         dialog.toggle_replace_btn.setChecked(True)  # 展开替换选项
         dialog._toggle_replace(True)
-        dialog.exec()
+        dialog.show()  # 使用 show() 而不是 exec() 以允许非模态
     
     def _show_stats(self):
         """显示文本统计"""
@@ -540,9 +554,9 @@ class CardWindow(QWidget):
     
     def apply_appearance(self, font_size, font_color, bg_color):
         """应用外观设置"""
-        # 更新字体大小
-        font = self.text_edit.font()
-        font.setPointSize(font_size)
+        # 更新字体（包括字体族和大小）
+        font_family = self.config.get('card.font_family', 'Consolas')
+        font = QFont(font_family, font_size)
         self.text_edit.setFont(font)
         
         # 更新配置

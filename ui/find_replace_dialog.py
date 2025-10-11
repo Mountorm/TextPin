@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QLineEdit, QPushButton, QCheckBox, QGroupBox,
                              QRadioButton, QMessageBox, QWidget)
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QTextCursor
+from PyQt6.QtGui import QTextCursor, QTextDocument
 
 
 class FindReplaceDialog(QDialog):
@@ -207,13 +207,13 @@ class FindReplaceDialog(QDialog):
         cursor = self.text_edit.textCursor()
         
         # 构建搜索标志
-        flags = QTextCursor.FindFlag(0)
+        flags = QTextDocument.FindFlag(0)
         if self.case_sensitive.isChecked():
-            flags |= QTextCursor.FindFlag.FindCaseSensitively
+            flags |= QTextDocument.FindFlag.FindCaseSensitively
         if self.whole_word.isChecked():
-            flags |= QTextCursor.FindFlag.FindWholeWords
+            flags |= QTextDocument.FindFlag.FindWholeWords
         if self.search_up.isChecked():
-            flags |= QTextCursor.FindFlag.FindBackward
+            flags |= QTextDocument.FindFlag.FindBackward
         
         # 从当前位置查找
         if self.use_regex.isChecked():

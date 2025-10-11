@@ -65,25 +65,59 @@ TextPin 是一款**极简高效**的剪贴板贴卡工具，专为需要频繁�
 ## 🚀 快速开始
 
 ### 环境要求
-- Windows 10 或更高版本
-- Python 3.10 或更高版本
+- **操作系统**：Windows 10 或更高版本
+- **Python**：3.10 或更高版本
+- **依赖包**：PyQt6 >= 6.7.0, pyperclip >= 1.8.2
 
 ### 安装步骤
 
-1. **克隆或下载项目**
+#### 1. 克隆项目
 ```bash
-cd textPin
+git clone https://github.com/yourusername/textpin.git
+cd textpin
 ```
 
-2. **安装依赖**
+#### 2. 安装依赖
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **运行应用**
+或手动安装：
+```bash
+pip install PyQt6>=6.7.0 pyperclip>=1.8.2
+```
+
+#### 3. 运行应用
 ```bash
 python main.py
 ```
+
+### 首次运行
+
+1. 程序启动后会自动显示**设置窗口**
+2. 系统托盘出现 **TextPin 图标**
+3. 默认快捷键为 **F4**
+
+### 快速测试
+
+1. 在任意应用中复制一段文字（Ctrl+C）
+2. 按 **F4** 键
+3. 贴卡自动出现在鼠标位置！
+
+### 常见问题
+
+**Q: 提示缺少依赖？**
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+**Q: F4 快捷键没反应？**
+- 可能被其他程序占用，在设置中更换快捷键
+- 以管理员身份运行程序
+
+**Q: 如何退出程序？**
+- 右键系统托盘图标 → 退出
 
 ---
 
@@ -189,30 +223,79 @@ python main.py
 ```
 textpin/
 ├── main.py                      # 应用入口
-├── requirements.txt             # Python依赖
-├── config.json                  # 配置文件（自动生成）
-├── textpin.db                   # SQLite数据库（自动生成）
+├── requirements.txt             # Python依赖包列表
+├── .gitignore                   # Git忽略文件配置
+├── LICENSE                      # MIT开源协议
+├── README.md                    # 项目说明文档（本文件）
 ├── PRD.md                       # 产品需求文档
-├── README.md                    # 项目文档
+├── CHANGELOG.md                 # 版本更新日志
 │
-├── core/                        # 核心模块
-│   ├── __init__.py
-│   ├── app_manager.py           # 应用管理器（核心控制）
-│   ├── clipboard_monitor.py     # 剪贴板监听
-│   ├── hotkey_manager.py        # 全局快捷键管理
-│   └── storage.py               # 数据存储（SQLite）
+├── config.json                  # 配置文件（运行时自动生成）
+├── textpin.db                   # SQLite数据库（运行时自动生成）
 │
-├── ui/                          # UI模块
-│   ├── __init__.py
-│   ├── card_window.py           # 贴卡窗口
+├── core/                        # 核心业务模块
+│   ├── __init__.py              # 模块导出
+│   ├── app_manager.py           # 应用管理器（协调中心）
+│   ├── clipboard_monitor.py     # 剪贴板监听器
+│   ├── hotkey_manager.py        # 全局快捷键管理器
+│   └── storage.py               # 数据存储管理器（SQLite）
+│
+├── ui/                          # 用户界面模块
+│   ├── __init__.py              # 模块导出
+│   ├── card_window.py           # 贴卡窗口（核心UI）
 │   ├── settings_window.py       # 设置窗口
 │   ├── hotkey_edit.py           # 快捷键编辑控件
 │   └── find_replace_dialog.py   # 查找替换对话框
 │
 └── utils/                       # 工具模块
-    ├── __init__.py
-    └── config.py                # 配置管理（JSON）
+    ├── __init__.py              # 模块导出
+    └── config.py                # 配置管理器（JSON）
 ```
+
+### 📄 核心文件说明
+
+#### 根目录文件
+
+| 文件 | 说明 |
+|------|------|
+| `main.py` | 应用程序入口，初始化 QApplication 和 AppManager |
+| `requirements.txt` | Python 依赖包列表（PyQt6, pyperclip） |
+| `.gitignore` | Git 版本控制忽略规则 |
+| `LICENSE` | MIT 开源许可证 |
+| `README.md` | 项目使用文档和说明 |
+| `PRD.md` | 产品需求文档，包含功能设计和技术架构 |
+| `CHANGELOG.md` | 版本更新历史和功能变更记录 |
+
+#### 运行时生成文件
+
+| 文件 | 说明 |
+|------|------|
+| `config.json` | 用户配置文件，保存所有设置项 |
+| `textpin.db` | SQLite 数据库，存储剪贴板历史记录 |
+
+#### core/ 核心模块
+
+| 文件 | 说明 | 主要功能 |
+|------|------|---------|
+| `app_manager.py` | 应用管理器 | 协调所有组件，管理贴卡生命周期，处理信号通信 |
+| `clipboard_monitor.py` | 剪贴板监听器 | 监听系统剪贴板变化，智能过滤内部复制，保存历史 |
+| `hotkey_manager.py` | 快捷键管理器 | 注册/注销全局快捷键，处理 Windows API 消息 |
+| `storage.py` | 数据存储管理器 | SQLite 数据库操作，历史记录增删查改 |
+
+#### ui/ 界面模块
+
+| 文件 | 说明 | 主要功能 |
+|------|------|---------|
+| `card_window.py` | 贴卡窗口 | 悬浮文本卡片，支持编辑、拖动、调整大小、查找替换 |
+| `settings_window.py` | 设置窗口 | 5个标签页：常规、贴卡、快捷键、历史记录、关于 |
+| `hotkey_edit.py` | 快捷键编辑控件 | 自定义快捷键输入控件，支持修饰键组合 |
+| `find_replace_dialog.py` | 查找替换对话框 | 统一的查找替换界面，支持正则表达式 |
+
+#### utils/ 工具模块
+
+| 文件 | 说明 | 主要功能 |
+|------|------|---------|
+| `config.py` | 配置管理器 | JSON 配置文件读写，默认值管理，配置验证 |
 
 ---
 

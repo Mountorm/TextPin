@@ -4,7 +4,7 @@
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QPushButton, QCheckBox, QSpinBox, 
                              QGroupBox, QFormLayout, QLineEdit, QTabWidget,
-                             QListWidget, QMessageBox, QSystemTrayIcon, QMenu)
+                             QListWidget, QMessageBox, QSystemTrayIcon, QMenu, QComboBox)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QAction, QIcon, QKeySequence
 from core import StorageManager
@@ -38,7 +38,7 @@ class SettingsWindow(QMainWindow):
     def _init_ui(self):
         """初始化UI"""
         self.setWindowTitle("TextPin - 设置")
-        self.setMinimumSize(600, 500)
+        self.setMinimumSize(600, 600)
         
         # 中心部件
         central_widget = QWidget()
@@ -140,6 +140,17 @@ class SettingsWindow(QMainWindow):
         self.card_opacity_spin.setSuffix(" %")
         card_layout.addRow("透明度:", self.card_opacity_spin)
         
+        # 字体选择
+        from PyQt6.QtGui import QFontDatabase
+        font_layout = QHBoxLayout()
+        self.font_family_combo = QComboBox()
+        # 获取系统所有字体（PyQt6 使用静态方法）
+        fonts = QFontDatabase.families()
+        self.font_family_combo.addItems(fonts)
+        self.font_family_combo.setCurrentText("Consolas")
+        font_layout.addWidget(self.font_family_combo)
+        card_layout.addRow("字体:", font_layout)
+        
         # 字体大小
         self.font_size_spin = QSpinBox()
         self.font_size_spin.setRange(8, 24)
@@ -170,6 +181,7 @@ class SettingsWindow(QMainWindow):
         self.bg_color_btn.clicked.connect(self._choose_bg_color)
         bg_color_layout.addWidget(self.bg_color_btn)
         card_layout.addRow("背景颜色:", bg_color_layout)
+        
         
         card_group.setLayout(card_layout)
         layout.addWidget(card_group)
@@ -444,6 +456,12 @@ class SettingsWindow(QMainWindow):
         self.card_opacity_spin.setValue(
             int(self.config.get('card.opacity', 0.95) * 100)
         )
+        # 字体
+        font_family = self.config.get('card.font_family', 'Consolas')
+        index = self.font_family_combo.findText(font_family)
+        if index >= 0:
+            self.font_family_combo.setCurrentIndex(index)
+        
         self.font_size_spin.setValue(
             self.config.get('card.font_size', 10)
         )
@@ -513,12 +531,15 @@ class SettingsWindow(QMainWindow):
         old_font_color = self.config.get('card.font_color', '#000000')
         old_bg_color = self.config.get('card.bg_color', '#FFFFFF')
         
+        new_font_family = self.font_family_combo.currentText()
+        
         self.config.set('card.default_width', new_width)
         self.config.set('card.default_height', new_height)
         auto_height_value = self.auto_height_check.isChecked()
         self.config.set('card.auto_height', auto_height_value)
         print(f"✓ 保存配置: card.auto_height = {auto_height_value}")
         self.config.set('card.opacity', new_opacity)
+        self.config.set('card.font_family', new_font_family)
         self.config.set('card.font_size', new_font_size)
         self.config.set('card.font_color', new_font_color)
         self.config.set('card.bg_color', new_bg_color)
@@ -546,7 +567,9 @@ class SettingsWindow(QMainWindow):
             self.card_style_changed.emit(new_width, new_height, new_opacity)
         
         # 贴卡外观改变 - 应用到所有现有贴卡
-        if (new_font_size != old_font_size or new_font_color != old_font_color or new_bg_color != old_bg_color):
+        old_font_family = self.config.get('card.font_family', 'Consolas')
+        if (new_font_size != old_font_size or new_font_color != old_font_color or 
+            new_bg_color != old_bg_color or new_font_family != old_font_family):
             self.card_appearance_changed.emit(new_font_size, new_font_color, new_bg_color)
         
         # 只在需要时显示提示
