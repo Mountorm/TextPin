@@ -23,6 +23,10 @@ wheels/
 # PyInstaller
 *.manifest
 *.spec
+*.iss
+installer/
+LICENSE.txt
+README_INSTALL.txt
 
 # Virtual Environment
 venv/

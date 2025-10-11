@@ -1,0 +1,12 @@
+# TextPin 打包所需的依赖包
+# 安装命令: pip install -r requirements_build.txt
+
+# 核心打包工具
+pyinstaller>=5.13.0
+
+# 图标生成工具
+Pillow>=10.0.0
+
+# 项目运行依赖（打包时也需要）
+PyQt6>=6.5.0
+pyperclip>=1.8.2
