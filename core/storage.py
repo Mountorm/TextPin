@@ -83,21 +83,23 @@ class StorageManager:
         existing = cursor.fetchone()
         
         if existing:
-            # 更新时间戳
+            # 更新时间戳 - 使用 SQLite 的 CURRENT_TIMESTAMP 确保格式一致
             cursor.execute(
-                'UPDATE clipboard_history SET timestamp = ? WHERE id = ?',
-                (datetime.now(), existing['id'])
+                'UPDATE clipboard_history SET timestamp = CURRENT_TIMESTAMP WHERE id = ?',
+                (existing['id'],)
             )
             self.conn.commit()
+            print(f"✓ 更新已存在记录的时间戳: ID={existing['id']}")
             return existing['id']
         else:
-            # 插入新记录
+            # 插入新记录 - 使用 CURRENT_TIMESTAMP 确保与更新时格式一致
             cursor.execute('''
                 INSERT INTO clipboard_history 
-                (content, content_hash, char_count, word_count) 
-                VALUES (?, ?, ?, ?)
+                (content, content_hash, char_count, word_count, timestamp) 
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             ''', (content, content_hash, char_count, word_count))
             self.conn.commit()
+            print(f"✓ 插入新记录: ID={cursor.lastrowid}")
             return cursor.lastrowid
     
     def get_history(self, limit=50, favorites_only=False):

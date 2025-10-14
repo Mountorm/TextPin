@@ -64,10 +64,14 @@ class SettingsWindow(QMainWindow):
         self.tab_widget.addTab(self._create_features_tab(), "功能")
         
         # 历史记录
+        self.history_tab_index = 2  # 记录历史记录标签的索引
         self.tab_widget.addTab(self._create_history_tab(), "历史记录")
         
         # 关于
         self.tab_widget.addTab(self._create_about_tab(), "关于")
+        
+        # 连接标签页切换信号
+        self.tab_widget.currentChanged.connect(self._on_tab_changed)
         
         main_layout.addWidget(self.tab_widget)
         
@@ -376,7 +380,7 @@ class SettingsWindow(QMainWindow):
         layout.addWidget(title_label)
         
         # 版本
-        version_label = QLabel("版本 2.0.0")
+        version_label = QLabel("版本 2.0.1")
         version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(version_label)
         
@@ -474,7 +478,7 @@ class SettingsWindow(QMainWindow):
             self,
             "关于 TextPin",
             "<h2>📋 TextPin 2.0</h2>"
-            "<p>版本 2.0.0</p>"
+            "<p>版本 2.0.1</p>"
             "<p>轻量级桌面贴卡工具</p>"
             "<p>支持剪贴板监听、卡片贴图、历史记录管理</p>"
             "<br>"
@@ -718,6 +722,21 @@ class SettingsWindow(QMainWindow):
         # 恢复选中（如果还有效）
         if current_row >= 0 and current_row < self.history_list.count():
             self.history_list.setCurrentRow(current_row)
+    
+    def _on_tab_changed(self, index):
+        """标签页切换时的处理"""
+        # 当切换到历史记录标签时，自动刷新
+        if index == self.history_tab_index:
+            print("✓ 切换到历史记录标签，自动刷新...")
+            self.refresh_history()
+    
+    def showEvent(self, event):
+        """窗口显示事件 - 确保显示时历史记录是最新的"""
+        super().showEvent(event)
+        # 如果当前在历史记录标签，刷新数据
+        if self.tab_widget.currentIndex() == self.history_tab_index:
+            print("✓ 窗口显示时刷新历史记录...")
+            self.refresh_history()
     
     def _load_history_to_card(self):
         """加载历史到贴卡"""

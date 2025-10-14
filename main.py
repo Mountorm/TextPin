@@ -19,7 +19,7 @@ def main():
     # 创建应用程序实例
     app = QApplication(sys.argv)
     app.setApplicationName("TextPin")
-    app.setApplicationVersion("2.0.0")
+    app.setApplicationVersion("2.0.1")
     app.setOrganizationName("TextPin")
     app.setQuitOnLastWindowClosed(False)  # 关闭窗口不退出应用
     

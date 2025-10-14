@@ -9,15 +9,17 @@ from pathlib import Path
 
 # 配置信息
 APP_NAME = "TextPin"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.0.1"
 AUTHOR = "TextPin Team"
 DESCRIPTION = "桌面便签工具 - 轻量、高效、美观"
 
 # 路径配置
-ROOT_DIR = Path(__file__).parent
+SCRIPT_DIR = Path(__file__).parent  # build_tools 目录
+ROOT_DIR = SCRIPT_DIR.parent  # 项目根目录
 BUILD_DIR = ROOT_DIR / "build"
 DIST_DIR = ROOT_DIR / "dist"
-ICON_FILE = ROOT_DIR / "resources" / "icon.ico"
+ICON_FILE = SCRIPT_DIR / "resources" / "icon.ico"
+MAIN_PY = ROOT_DIR / "main.py"
 
 # PyInstaller 配置模板
 SPEC_TEMPLATE = """# -*- mode: python ; coding: utf-8 -*-
@@ -27,11 +29,11 @@ SPEC_TEMPLATE = """# -*- mode: python ; coding: utf-8 -*-
 block_cipher = None
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    ['{main_py}'],
+    pathex=['{root_dir}'],
     binaries=[],
     datas=[
-        ('resources', 'resources'),
+        ('{root_dir}/resources', 'resources'),
     ],
     hiddenimports=[
         'PyQt6.QtCore',
@@ -215,7 +217,7 @@ def check_requirements():
 
 def create_icon():
     """创建默认图标（如果不存在）"""
-    resources_dir = ROOT_DIR / "resources"
+    resources_dir = SCRIPT_DIR / "resources"
     resources_dir.mkdir(exist_ok=True)
     
     if not ICON_FILE.exists():
@@ -228,14 +230,20 @@ def generate_spec_file():
     """生成 PyInstaller spec 文件"""
     print_step(2, "生成 PyInstaller 配置")
     
-    icon_path = str(ICON_FILE) if ICON_FILE.exists() else ''
+    # 使用正斜杠避免转义问题
+    icon_path = str(ICON_FILE).replace('\\', '/') if ICON_FILE.exists() else ''
+    main_py_path = str(MAIN_PY).replace('\\', '/')
+    root_dir_path = str(ROOT_DIR).replace('\\', '/')
+    
     spec_content = SPEC_TEMPLATE.format(
         version=APP_VERSION,
         app_name=APP_NAME,
-        icon=icon_path
+        icon=icon_path,
+        main_py=main_py_path,
+        root_dir=root_dir_path
     )
     
-    spec_file = ROOT_DIR / f"{APP_NAME}.spec"
+    spec_file = SCRIPT_DIR / f"{APP_NAME}.spec"
     spec_file.write_text(spec_content, encoding='utf-8')
     print(f"✓ 已生成: {spec_file}")
     
@@ -251,7 +259,7 @@ def generate_inno_setup_script():
         author=AUTHOR
     )
     
-    script_file = ROOT_DIR / f"{APP_NAME}_Setup.iss"
+    script_file = SCRIPT_DIR / f"{APP_NAME}_Setup.iss"
     script_file.write_text(script_content, encoding='utf-8-sig')  # 使用 BOM
     print(f"✓ 已生成: {script_file}")
     
@@ -262,7 +270,7 @@ def create_readme_files():
     print_step(4, "创建安装说明文件")
     
     # 创建 LICENSE.txt
-    license_file = ROOT_DIR / "LICENSE.txt"
+    license_file = SCRIPT_DIR / "LICENSE.txt"
     if not license_file.exists():
         license_file.write_text("""MIT License
 
@@ -289,7 +297,7 @@ SOFTWARE.
         print(f"✓ 已创建: {license_file}")
     
     # 创建安装前说明
-    readme_install = ROOT_DIR / "README_INSTALL.txt"
+    readme_install = SCRIPT_DIR / "README_INSTALL.txt"
     readme_install.write_text("""欢迎安装 TextPin！
 
 TextPin 是一款轻量、高效、美观的桌面便签工具。
@@ -315,10 +323,11 @@ def build_executable():
     """使用 PyInstaller 打包"""
     print_step(5, "执行 PyInstaller 打包")
     
-    spec_file = ROOT_DIR / f"{APP_NAME}.spec"
+    spec_file = SCRIPT_DIR / f"{APP_NAME}.spec"
     
     if not spec_file.exists():
         print("✗ spec 文件不存在")
+        print(f"  查找路径: {spec_file}")
         return False
     
     cmd = [
@@ -329,6 +338,7 @@ def build_executable():
     ]
     
     print(f"执行命令: {' '.join(cmd)}")
+    # 在项目根目录执行，这样相对路径才正确
     result = subprocess.run(cmd, cwd=ROOT_DIR)
     
     if result.returncode == 0:
@@ -360,11 +370,11 @@ def build_installer():
         print("  请安装后手动编译 .iss 文件")
         return False
     
-    script_file = ROOT_DIR / f"{APP_NAME}_Setup.iss"
+    script_file = SCRIPT_DIR / f"{APP_NAME}_Setup.iss"
     cmd = [iscc_exe, str(script_file)]
     
     print(f"执行命令: {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=ROOT_DIR)
+    result = subprocess.run(cmd, cwd=SCRIPT_DIR)
     
     if result.returncode == 0:
         print("✓ 安装程序创建成功")

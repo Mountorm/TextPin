@@ -1,74 +1,79 @@
 @echo off
-chcp 65001 >nul
-echo ╔═══════════════════════════════════════════════════════════╗
-echo ║                                                           ║
-echo ║   TextPin 一键打包工具                                    ║
-echo ║                                                           ║
-echo ╚═══════════════════════════════════════════════════════════╝
+echo ============================================================
+echo.
+echo   TextPin Build Tool
+echo.
+echo ============================================================
 echo.
 
-REM 检查 Python
+REM Check Python
 where python >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [错误] 未找到 Python！
-    echo 请先安装 Python 3.8+
+    echo [ERROR] Python not found!
+    echo Please install Python 3.10+
     pause
     exit /b 1
 )
 
-echo [✓] 找到 Python
+echo [OK] Python found
 python --version
 echo.
 
-REM 检查依赖
-echo [1/4] 检查依赖...
+REM Check dependencies
+echo [1/4] Checking dependencies...
 pip show pyinstaller >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [!] PyInstaller 未安装，正在安装...
+    echo [!] Installing PyInstaller...
     pip install pyinstaller
 )
 
 pip show pillow >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [!] Pillow 未安装，正在安装...
+    echo [!] Installing Pillow...
     pip install pillow
 )
-echo [✓] 依赖检查完成
+echo [OK] Dependencies ready
 echo.
 
-REM 创建图标
-echo [2/4] 创建图标...
+REM Create icon
+echo [2/4] Creating icon...
+cd ..
 if not exist "resources\icon.ico" (
+    cd build_tools
     python create_icon.py
+    cd ..
 ) else (
-    echo [✓] 图标已存在
+    echo [OK] Icon already exists
 )
 echo.
 
-REM 执行打包
-echo [3/4] 开始打包...
+REM Build
+echo [3/4] Building...
+cd build_tools
 python build_installer.py
 if %errorlevel% neq 0 (
     echo.
-    echo [错误] 打包失败！
+    echo [ERROR] Build failed!
+    cd ..
     pause
     exit /b 1
 )
+cd ..
 echo.
 
-REM 完成
-echo [4/4] 打包完成！
+REM Done
+echo [4/4] Build complete!
 echo.
-echo ═══════════════════════════════════════════════════════════
+echo ============================================================
 echo.
-echo 打包结果：
-echo   可执行文件: dist\TextPin\TextPin.exe
-echo   安装程序: installer\TextPin_Setup_v2.0.0.exe
+echo Output:
+echo   Executable: dist\TextPin\TextPin.exe
+echo   Installer:  installer\TextPin_Setup_v2.0.1.exe
 echo.
-echo 按任意键打开输出目录...
+echo Press any key to open output folders...
 pause >nul
 
-REM 打开输出目录
+REM Open output folders
 if exist "dist\TextPin" (
     explorer dist\TextPin
 )
