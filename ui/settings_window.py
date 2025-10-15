@@ -146,6 +146,12 @@ class SettingsWindow(QMainWindow):
         self.card_opacity_spin.setSuffix(" %")
         card_layout.addRow("透明度:", self.card_opacity_spin)
         
+        # 默认置顶
+        self.always_on_top_check = QCheckBox("默认置顶")
+        self.always_on_top_check.setToolTip("新创建的贴卡默认置顶（可在贴卡上单独调整）")
+        self.always_on_top_check.setChecked(True)
+        card_layout.addRow("置顶设置:", self.always_on_top_check)
+        
         # 字体选择
         from PyQt6.QtGui import QFontDatabase
         font_layout = QHBoxLayout()
@@ -536,6 +542,10 @@ class SettingsWindow(QMainWindow):
         self.card_opacity_spin.setValue(
             int(self.config.get('card.opacity', 0.95) * 100)
         )
+        # 置顶设置
+        self.always_on_top_check.setChecked(
+            self.config.get('card.always_on_top', True)
+        )
         # 字体
         font_family = self.config.get('card.font_family', 'Consolas')
         index = self.font_family_combo.findText(font_family)
@@ -636,6 +646,10 @@ class SettingsWindow(QMainWindow):
         self.config.set('card.auto_height', auto_height_value)
         print(f"✓ 保存配置: card.auto_height = {auto_height_value}")
         self.config.set('card.opacity', new_opacity)
+        # 保存置顶设置
+        new_always_on_top = self.always_on_top_check.isChecked()
+        self.config.set('card.always_on_top', new_always_on_top)
+        print(f"✓ 保存配置: card.always_on_top = {new_always_on_top}")
         self.config.set('card.font_family', new_font_family)
         self.config.set('card.font_size', new_font_size)
         self.config.set('card.font_color', new_font_color)

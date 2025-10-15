@@ -27,7 +27,8 @@ class CardWindow(QWidget):
         ('stats', '文本统计', '📊', '', '_show_stats', '显示字符、行数等统计信息'),
         ('json_format', 'JSON格式化', '{ }', '', '_on_json_format', '格式化JSON内容'),
         ('separator2', '---', '', '', '', ''),  # 分隔符
-        ('pin', '固定窗口', '📌', 'Ctrl+P', '_toggle_pin', '固定窗口位置和大小'),
+        ('pin', '固定位置', '📌', 'Ctrl+P', '_toggle_pin', '固定窗口位置和尺寸，禁止拖动和调整'),
+        ('always_on_top', '窗口置顶', '🔺', 'Ctrl+T', '_toggle_always_on_top', '切换窗口是否始终置顶'),
         ('close', '关闭贴卡', '✖', 'Ctrl+W', 'close', '关闭当前贴卡'),
     ]
     
@@ -41,11 +42,21 @@ class CardWindow(QWidget):
         from utils import ConfigManager
         self.config = ConfigManager()
         
+        # 状态变量（必须在使用前定义）
+        # 固定状态（位置和尺寸）
+        self.is_pinned = False
+        # 置顶状态（默认开启）
+        self.is_always_on_top = self.config.get('card.always_on_top', True)
+        
         # 窗口设置
-        self.setWindowFlags(
+        window_flags = (
             Qt.WindowType.FramelessWindowHint |  # 无边框
             Qt.WindowType.Tool  # 工具窗口，不显示在任务栏
         )
+        # 如果默认置顶，添加置顶标志
+        if self.is_always_on_top:
+            window_flags |= Qt.WindowType.WindowStaysOnTopHint
+        self.setWindowFlags(window_flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)  # 透明背景
         
         # 拖动相关
@@ -56,9 +67,6 @@ class CardWindow(QWidget):
         self.resizing = False
         self.resize_edge = None
         self.resize_margin = 8  # 边缘检测范围
-        
-        # 固定状态
-        self.is_pinned = False
         
         # 快捷键列表（用于管理和清理）
         self.shortcuts = []
@@ -417,10 +425,15 @@ class CardWindow(QWidget):
                 if method_name == 'close':
                     action.triggered.connect(self.close)
                 elif method_name == '_toggle_pin':
-                    # 固定窗口需要特殊处理（可选中状态）
+                    # 固定位置需要特殊处理（可选中状态）
                     action.setCheckable(True)
                     action.setChecked(self.is_pinned)
                     action.triggered.connect(self._toggle_pin)
+                elif method_name == '_toggle_always_on_top':
+                    # 窗口置顶需要特殊处理（可选中状态）
+                    action.setCheckable(True)
+                    action.setChecked(self.is_always_on_top)
+                    action.triggered.connect(self._toggle_always_on_top)
                 else:
                     # 动态获取方法
                     method = getattr(self, method_name, None)
@@ -486,6 +499,9 @@ class CardWindow(QWidget):
             elif method_name == '_toggle_pin':
                 # 使用专门的切换方法
                 method = self._shortcut_toggle_pin
+            elif method_name == '_toggle_always_on_top':
+                # 使用专门的切换方法
+                method = self._shortcut_toggle_always_on_top
             else:
                 method = getattr(self, method_name, None)
             
@@ -515,6 +531,10 @@ class CardWindow(QWidget):
     def _shortcut_toggle_pin(self):
         """快捷键触发的固定切换（不需要 checked 参数）"""
         self._toggle_pin(not self.is_pinned)
+    
+    def _shortcut_toggle_always_on_top(self):
+        """快捷键触发的置顶切换（不需要 checked 参数）"""
+        self._toggle_always_on_top(not self.is_always_on_top)
     
     def _execute_custom_rule(self, rule):
         """执行自定义规则"""
@@ -551,25 +571,32 @@ class CardWindow(QWidget):
         print("✓ 菜单配置已重新加载")
     
     def _toggle_pin(self, checked):
-        """固定/取消固定窗口"""
+        """固定/取消固定位置和尺寸"""
         self.is_pinned = checked
         if checked:
-            # 固定：置顶 + 禁止移动和调整大小
-            self.setWindowFlags(
-                Qt.WindowType.FramelessWindowHint |
-                Qt.WindowType.WindowStaysOnTopHint |  # 置顶
-                Qt.WindowType.Tool
-            )
-            self.show()  # 重新显示窗口以应用标志
-            print("✓ 窗口已固定（置顶 + 锁定位置和大小）")
+            print("✓ 窗口已固定（锁定位置和尺寸）")
         else:
-            # 取消固定：不置顶 + 允许移动和调整大小
-            self.setWindowFlags(
-                Qt.WindowType.FramelessWindowHint |
-                Qt.WindowType.Tool
-            )
-            self.show()  # 重新显示窗口以应用标志
-            print("✓ 窗口已取消固定（可移动 + 可调整大小）")
+            print("✓ 窗口已取消固定（可移动和调整大小）")
+    
+    def _toggle_always_on_top(self, checked):
+        """切换窗口置顶状态"""
+        self.is_always_on_top = checked
+        
+        # 更新窗口标志
+        window_flags = (
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.Tool
+        )
+        if self.is_always_on_top:
+            window_flags |= Qt.WindowType.WindowStaysOnTopHint
+        
+        self.setWindowFlags(window_flags)
+        self.show()  # 重新显示窗口以应用标志
+        
+        if checked:
+            print("✓ 窗口已置顶")
+        else:
+            print("✓ 窗口已取消置顶")
     
     def _on_clear(self):
         """清空内容"""

@@ -7,7 +7,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![PyQt6](https://img.shields.io/badge/PyQt6-6.7.0-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
-![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-2.0.2-brightgreen.svg)
 
 [快速开始](#-快速开始) • [功能特性](#-核心功能) • [使用指南](#-使用指南) • [打包分发](#-打包分发) • [项目结构](#-项目结构)
 
@@ -202,14 +202,21 @@ pip install -r requirements.txt
 
 **移动贴卡**
 - 鼠标拖动贴卡上边缘（20px 区域）
+- 使用 `Ctrl+P` 可固定位置，禁止拖动
 
 **调整大小**
 - 拖动贴卡四周边缘和四个角
 - 或在设置中配置默认尺寸
+- 使用 `Ctrl+P` 可固定尺寸，禁止调整
+
+**置顶控制**
+- 新贴卡默认置顶（可在设置中修改）
+- 使用 `Ctrl+T` 切换置顶状态
+- 或右键菜单选择“窗口置顶”
 
 **关闭贴卡**
 - 点击右上角 ❌ 按钮
-- 或按 Alt+F4
+- 或按 `Ctrl+W` / `Alt+F4`
 
 #### 4. 配置设置
 
@@ -227,6 +234,7 @@ pip install -r requirements.txt
 - **默认宽度/高度** - 新贴卡的初始尺寸
 - **自动高度** - 根据内容自动调整高度
 - **透明度** - 贴卡透明度（50-100%）
+- **默认置顶** - 新创建的贴卡是否默认置顶 (新)
 - **字体大小** - 文字字号（8-24pt）
 - **字体颜色** - 文字颜色
 - **背景颜色** - 贴卡背景色
@@ -255,6 +263,10 @@ pip install -r requirements.txt
 | `Ctrl+A` | 全选 |
 | `Ctrl+F` | 查找 |
 | `Ctrl+H` | 替换 |
+| `Ctrl+N` | 清空内容 |
+| `Ctrl+P` | 切换固定位置 (新) |
+| `Ctrl+T` | 切换窗口置顶 (新) |
+| `Ctrl+W` | 关闭贴卡 |
 | `Alt+F4` | 关闭贴卡 |
 
 ---
