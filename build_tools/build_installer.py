@@ -16,8 +16,9 @@ DESCRIPTION = "桌面便签工具 - 轻量、高效、美观"
 # 路径配置
 SCRIPT_DIR = Path(__file__).parent  # build_tools 目录
 ROOT_DIR = SCRIPT_DIR.parent  # 项目根目录
-BUILD_DIR = ROOT_DIR / "build"
-DIST_DIR = ROOT_DIR / "dist"
+BUILD_DIR = SCRIPT_DIR / "build"  # 中间文件目录
+DIST_DIR = SCRIPT_DIR / "dist"  # 输出目录
+INSTALLER_DIR = SCRIPT_DIR / "installer"  # 安装程序目录
 ICON_FILE = SCRIPT_DIR / "resources" / "icon.ico"
 MAIN_PY = ROOT_DIR / "main.py"
 
@@ -26,15 +27,20 @@ SPEC_TEMPLATE = """# -*- mode: python ; coding: utf-8 -*-
 # TextPin PyInstaller 配置文件 - 自动生成
 # 版本: {version}
 
+import sys
+from pathlib import Path
+
 block_cipher = None
+
+# 设置构建目录
+WORKPATH = r'{build_dir}'
+DISTPATH = r'{dist_dir}'
 
 a = Analysis(
     ['{main_py}'],
     pathex=['{root_dir}'],
     binaries=[],
-    datas=[
-        ('{root_dir}/resources', 'resources'),
-    ],
+    datas={datas},
     hiddenimports=[
         'PyQt6.QtCore',
         'PyQt6.QtGui', 
@@ -89,6 +95,7 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name='{app_name}',
+    distpath=DISTPATH,
 )
 """
 
@@ -235,12 +242,31 @@ def generate_spec_file():
     main_py_path = str(MAIN_PY).replace('\\', '/')
     root_dir_path = str(ROOT_DIR).replace('\\', '/')
     
+    build_dir_path = str(BUILD_DIR).replace('\\', '/')
+    dist_dir_path = str(DIST_DIR).replace('\\', '/')
+    
+    # 检查 resources 目录（在 build_tools 下）
+    resources_dir = SCRIPT_DIR / "resources"
+    datas_list = []
+    if resources_dir.exists():
+        resources_path = str(resources_dir).replace('\\', '/')
+        datas_list.append(f"('{resources_path}', 'resources')")
+        print(f"✓ 找到资源目录: {resources_dir}")
+    else:
+        print(f"⚠ 资源目录不存在，跳过: {resources_dir}")
+    
+    # 格式化 datas 列表
+    datas_str = "[\n        " + ",\n        ".join(datas_list) + ",\n    ]" if datas_list else "[]"
+    
     spec_content = SPEC_TEMPLATE.format(
         version=APP_VERSION,
         app_name=APP_NAME,
         icon=icon_path,
         main_py=main_py_path,
-        root_dir=root_dir_path
+        root_dir=root_dir_path,
+        build_dir=build_dir_path,
+        dist_dir=dist_dir_path,
+        datas=datas_str
     )
     
     spec_file = SCRIPT_DIR / f"{APP_NAME}.spec"
@@ -334,6 +360,8 @@ def build_executable():
         'pyinstaller',
         '--clean',
         '--noconfirm',
+        '--workpath', str(BUILD_DIR),
+        '--distpath', str(DIST_DIR),
         str(spec_file)
     ]
     
@@ -422,10 +450,10 @@ def main():
     print(f"""
 打包结果：
 - 可执行文件: {DIST_DIR / APP_NAME / f'{APP_NAME}.exe'}
-- 安装程序: {ROOT_DIR / 'installer' / f'{APP_NAME}_Setup_v{APP_VERSION}.exe'}
+- 安装程序: {INSTALLER_DIR / f'{APP_NAME}_Setup_v{APP_VERSION}.exe'}
 
 使用说明：
-1. 直接运行: 解压 dist/{APP_NAME} 目录即可使用
+1. 直接运行: 解压 build_tools/dist/{APP_NAME} 目录即可使用
 2. 安装程序: 运行 .exe 安装程序，引导用户安装
 
 下一步：
@@ -433,6 +461,8 @@ def main():
 - 替换 resources/icon.ico 为自定义图标
 - 更新 LICENSE.txt 和 README_INSTALL.txt
 - 运行此脚本重新打包
+
+注意：所有构建产物都在 build_tools 目录下
 """)
 
 if __name__ == '__main__':

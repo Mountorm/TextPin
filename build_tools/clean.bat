@@ -7,8 +7,6 @@ echo.
 echo ============================================================
 echo.
 
-cd ..
-
 echo [1/5] Cleaning build directory...
 if exist "build" (
     rmdir /s /q build
@@ -56,10 +54,12 @@ if exist "README_INSTALL.txt" (
 
 echo.
 echo [5/5] Cleaning Python cache...
+cd ..
 for /d /r %%d in (__pycache__) do @if exist "%%d" (
     rmdir /s /q "%%d"
     echo [OK] Removed %%d
 )
+cd build_tools
 
 echo.
 echo ============================================================

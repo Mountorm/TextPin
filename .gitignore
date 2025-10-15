@@ -4,9 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -20,13 +18,14 @@ wheels/
 .installed.cfg
 *.egg
 
-# PyInstaller
-*.manifest
-*.spec
-*.iss
-installer/
-LICENSE.txt
-README_INSTALL.txt
+# PyInstaller - 构建产物在 build_tools 目录下
+build_tools/build/
+build_tools/dist/
+build_tools/installer/
+build_tools/*.spec
+build_tools/*.iss
+build_tools/LICENSE.txt
+build_tools/README_INSTALL.txt
 
 # Virtual Environment
 venv/

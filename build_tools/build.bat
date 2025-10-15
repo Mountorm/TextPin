@@ -67,17 +67,17 @@ echo.
 echo ============================================================
 echo.
 echo Output:
-echo   Executable: dist\TextPin\TextPin.exe
-echo   Installer:  installer\TextPin_Setup_v2.0.1.exe
+echo   Executable: build_tools\dist\TextPin\TextPin.exe
+echo   Installer:  build_tools\installer\TextPin_Setup_v2.0.1.exe
 echo.
 echo Press any key to open output folders...
 pause >nul
 
 REM Open output folders
-if exist "dist\TextPin" (
-    explorer dist\TextPin
+if exist "build_tools\dist\TextPin" (
+    explorer build_tools\dist\TextPin
 )
 
-if exist "installer" (
-    explorer installer
+if exist "build_tools\installer" (
+    explorer build_tools\installer
 )
