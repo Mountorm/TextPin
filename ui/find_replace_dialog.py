@@ -128,6 +128,24 @@ class FindReplaceDialog(QDialog):
         self.status_label.setStyleSheet("color: #666; font-size: 11px;")
         layout.addWidget(self.status_label)
         
+        # 提示标签（正则模式下显示）
+        self.hint_label = QLabel(
+            "💡 正则模式提示：\n"
+            "   查找框：支持完整正则表达式语法 (如 \\d+ \\w+ .* 等)\n"
+            "   替换框：支持转义序列 \\n(换行) \\t(制表符) \\r(回车) \\\\(反斜杠)\n"
+            "   注意：暂不支持反向引用 (\\1 \\2 等)"
+        )
+        self.hint_label.setStyleSheet(
+            "color: #0066cc; font-size: 10px; padding: 5px; "
+            "background: #e6f2ff; border-radius: 3px; border: 1px solid #99ccff;"
+        )
+        self.hint_label.setWordWrap(True)
+        self.hint_label.hide()  # 默认隐藏
+        layout.addWidget(self.hint_label)
+        
+        # 连接正则选项变化
+        self.use_regex.toggled.connect(self._on_regex_toggled)
+        
         self.setLayout(layout)
         
         # 应用样式
@@ -182,14 +200,17 @@ class FindReplaceDialog(QDialog):
             self.replace_content.show()
             self.replace_btn.show()
             self.replace_all_btn.show()
-            self.toggle_replace_btn.setText("▲ 隐藏替换选项")
-            self.setWindowTitle("查找和替换")
         else:
             self.replace_content.hide()
             self.replace_btn.hide()
             self.replace_all_btn.hide()
-            self.toggle_replace_btn.setText("▼ 显示替换选项")
-            self.setWindowTitle("查找")
+    
+    def _on_regex_toggled(self, checked):
+        """正则选项切换时显示/隐藏提示"""
+        if checked:
+            self.hint_label.show()
+        else:
+            self.hint_label.hide()
     
     def _on_find_text_changed(self, text):
         """查找文本改变"""
@@ -264,10 +285,19 @@ class FindReplaceDialog(QDialog):
         
         if cursor.hasSelection():
             selected_text = cursor.selectedText()
+            
+            # 处理正则模式下的转义序列
+            actual_replace = replace_text
+            if self.use_regex.isChecked():
+                actual_replace = replace_text.replace('\\n', '\n') \
+                                             .replace('\\t', '\t') \
+                                             .replace('\\r', '\r') \
+                                             .replace('\\\\', '\\')
+            
             # 检查选中的是否是要查找的文本
             if (self.case_sensitive.isChecked() and selected_text == find_text) or \
                (not self.case_sensitive.isChecked() and selected_text.lower() == find_text.lower()):
-                cursor.insertText(replace_text)
+                cursor.insertText(actual_replace)
                 self.status_label.setText("已替换 1 处")
                 # 查找下一个
                 self._find_next()
@@ -291,7 +321,14 @@ class FindReplaceDialog(QDialog):
             import re
             flags = re.IGNORECASE if not self.case_sensitive.isChecked() else 0
             try:
-                new_content, count = re.subn(find_text, replace_text, content, flags=flags)
+                # 处理替换文本中的转义序列
+                # 支持: \n(换行) \t(制表符) \r(回车) \\(反斜杠)
+                processed_replace = replace_text.replace('\\n', '\n') \
+                                                 .replace('\\t', '\t') \
+                                                 .replace('\\r', '\r') \
+                                                 .replace('\\\\', '\\')
+                
+                new_content, count = re.subn(find_text, processed_replace, content, flags=flags)
                 if count > 0:
                     self.text_edit.setPlainText(new_content)
                     self.status_label.setText(f"已替换 {count} 处")

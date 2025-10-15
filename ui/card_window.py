@@ -19,14 +19,28 @@ class CardWindow(QWidget):
     MENU_FEATURES = [
         ('copy_all', '复制全部', '📋', '', '_on_copy', '复制所有内容到剪贴板'),
         ('clear', '清空内容', '🗑️', 'Ctrl+N', '_on_clear', '清空所有内容'),
-        ('clear_format', '清除格式', '🧹', '', '_on_clear_format', '移除所有文本格式，保留纯文本'),
-        ('clear_empty_lines', '清除空行', '📝', '', '_on_clear_empty_lines', '移除所有空白行'),
         ('separator1', '---', '', '', '', ''),  # 分隔符
         ('search', '搜索', '🔍', 'Ctrl+F', '_on_search', '查找文本'),
         ('replace', '替换', '🔄', 'Ctrl+H', '_on_replace', '查找并替换文本'),
         ('stats', '文本统计', '📊', '', '_show_stats', '显示字符、行数等统计信息'),
-        ('json_format', 'JSON格式化', '{ }', '', '_on_json_format', '格式化JSON内容'),
         ('separator2', '---', '', '', '', ''),  # 分隔符
+        # 文本处理功能（直接列出）
+        ('clear_format', '清除格式', '🧹', '', '_on_clear_format', '移除所有文本格式，保留纯文本'),
+        ('clear_empty_lines', '清除空行', '📝', '', '_on_clear_empty_lines', '移除所有空白行'),
+        ('json_format', 'JSON格式化', '{ }', '', '_on_json_format', '格式化JSON内容'),
+        ('separator3', '---', '', '', '', ''),  # 分隔符
+        ('case_upper', '全部大写', 'AA', '', '_on_case_upper', '转换为大写'),
+        ('case_lower', '全部小写', 'aa', '', '_on_case_lower', '转换为小写'),
+        ('case_title', '首字母大写', 'Aa', '', '_on_case_title', '每个单词首字母大写'),
+        ('case_capitalize', '句首大写', 'A~', '', '_on_case_capitalize', '仅第一个字母大写'),
+        ('separator4', '---', '', '', '', ''),  # 分隔符
+        ('strip_both', '去除两端空格', '✂️', '', '_on_strip_both', '去除每行两端的空格'),
+        ('strip_left', '去除行首空格', '◀️', '', '_on_strip_left', '去除每行开头的空格'),
+        ('strip_right', '去除行尾空格', '▶️', '', '_on_strip_right', '去除每行结尾的空格'),
+        ('separator5', '---', '', '', '', ''),  # 分隔符
+        ('add_prefix', '添加前缀', '⬅️', '', '_on_add_prefix', '在每行开头添加指定文本'),
+        ('add_suffix', '添加后缀', '➡️', '', '_on_add_suffix', '在每行结尾添加指定文本'),
+        ('separator6', '---', '', '', '', ''),  # 分隔符
         ('pin', '固定位置', '📌', 'Ctrl+P', '_toggle_pin', '固定窗口位置和尺寸，禁止拖动和调整'),
         ('always_on_top', '窗口置顶', '🔺', 'Ctrl+T', '_toggle_always_on_top', '切换窗口是否始终置顶'),
         ('close', '关闭贴卡', '✖', 'Ctrl+W', 'close', '关闭当前贴卡'),
@@ -750,6 +764,109 @@ class CardWindow(QWidget):
             f"单词数: {word_count}\n"
             f"行数: {line_count}"
         )
+    
+    # ==================== 大小写转换功能 ====================
+    
+    def _on_case_upper(self):
+        """转换为大写"""
+        text = self.text_edit.toPlainText()
+        if text:
+            self.text_edit.setPlainText(text.upper())
+            print("✓ 已转换为大写")
+    
+    def _on_case_lower(self):
+        """转换为小写"""
+        text = self.text_edit.toPlainText()
+        if text:
+            self.text_edit.setPlainText(text.lower())
+            print("✓ 已转换为小写")
+    
+    def _on_case_title(self):
+        """首字母大写"""
+        text = self.text_edit.toPlainText()
+        if text:
+            self.text_edit.setPlainText(text.title())
+            print("✓ 已转换为首字母大写")
+    
+    def _on_case_capitalize(self):
+        """句首大写"""
+        text = self.text_edit.toPlainText()
+        if text:
+            self.text_edit.setPlainText(text.capitalize())
+            print("✓ 已转换为句首大写")
+    
+    # ==================== 去除空格功能 ====================
+    
+    def _on_strip_both(self):
+        """去除两端空格"""
+        text = self.text_edit.toPlainText()
+        if text:
+            lines = text.split('\n')
+            result = '\n'.join([line.strip() for line in lines])
+            self.text_edit.setPlainText(result)
+            print("✓ 已去除两端空格")
+    
+    def _on_strip_left(self):
+        """去除行首空格"""
+        text = self.text_edit.toPlainText()
+        if text:
+            lines = text.split('\n')
+            result = '\n'.join([line.lstrip() for line in lines])
+            self.text_edit.setPlainText(result)
+            print("✓ 已去除行首空格")
+    
+    def _on_strip_right(self):
+        """去除行尾空格"""
+        text = self.text_edit.toPlainText()
+        if text:
+            lines = text.split('\n')
+            result = '\n'.join([line.rstrip() for line in lines])
+            self.text_edit.setPlainText(result)
+            print("✓ 已去除行尾空格")
+    
+    def _on_add_prefix(self):
+        """添加前缀"""
+        from PyQt6.QtWidgets import QInputDialog
+        
+        prefix, ok = QInputDialog.getText(
+            self,
+            '添加前缀',
+            '请输入要添加的前缀（将添加到每行开头）:'
+        )
+        
+        if ok and prefix:
+            text = self.text_edit.toPlainText()
+            if not text:
+                return
+            
+            lines = text.split('\n')
+            lines = [prefix + line for line in lines]
+            result = '\n'.join(lines)
+            
+            self.text_edit.setPlainText(result)
+            print(f"✓ 已添加前缀: {prefix}")
+    
+    def _on_add_suffix(self):
+        """添加后缀"""
+        from PyQt6.QtWidgets import QInputDialog
+        
+        suffix, ok = QInputDialog.getText(
+            self,
+            '添加后缀',
+            '请输入要添加的后缀（将添加到每行结尾）:'
+        )
+        
+        if ok and suffix:
+            text = self.text_edit.toPlainText()
+            if not text:
+                return
+            
+            lines = text.split('\n')
+            lines = [line + suffix for line in lines]
+            result = '\n'.join(lines)
+            
+            self.text_edit.setPlainText(result)
+            print(f"✓ 已添加后缀: {suffix}")
     
     def _on_json_format(self):
         """JSON 格式化"""

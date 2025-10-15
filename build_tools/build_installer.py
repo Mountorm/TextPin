@@ -9,7 +9,7 @@ from pathlib import Path
 
 # 配置信息
 APP_NAME = "TextPin"
-APP_VERSION = "2.0.2"
+APP_VERSION = "2.0.3"
 AUTHOR = "TextPin Team"
 DESCRIPTION = "桌面便签工具 - 轻量、高效、美观"
 

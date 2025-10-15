@@ -68,7 +68,7 @@ echo ============================================================
 echo.
 echo Output:
 echo   Executable: build_tools\dist\TextPin\TextPin.exe
-echo   Installer:  build_tools\installer\TextPin_Setup_v2.0.2.exe
+echo   Installer:  build_tools\installer\TextPin_Setup_v2.0.3.exe
 echo.
 echo Press any key to open output folders...
 pause >nul
